@@ -1,0 +1,6 @@
+# vim related
+*.swp
+vim_session
+
+# make
+bin/
