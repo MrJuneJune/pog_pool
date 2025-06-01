@@ -37,9 +37,11 @@ int main()
 
   printf("Query returned %d rows and %d columns\n", nrows, ncols);
 
-  for (int row = 0; row < nrows; row++) {
+  for (int row = 0; row < nrows; row++)
+  {
     printf("Row %d:\n", row+1);
-    for (int col = 0; col < ncols; col++) {
+    for (int col = 0; col < ncols; col++)
+    {
       char *value = PQgetvalue(pg_result, row, col);
       printf("\tColumn %d: %s\n", col + 1, value);
     }
