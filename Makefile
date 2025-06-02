@@ -13,6 +13,9 @@ test: $(TEST_DIR)/benchmark_connection_pool.c $(LIB_DIR)/connection.o | $(BIN_DI
 debug: main.c $(LIB_DIR)/connection.o | $(BIN_DIR)
 	$(CC) main.c $(LIB_DIR)/connection.o $(CFLAGS) -o $(BIN_DIR)/main
 
+lib/auto_generate.o: $(LIB_DIR)/auto_generate.c $(LIB_DIR)/auto_generate.h
+	$(CC) -c $(LIB_DIR)/auto_generate.c -o $(LIB_DIR)/auto_generate.o $(CFLAGS)
+
 lib/connection.o: $(LIB_DIR)/connection.c $(LIB_DIR)/connection.h
 	$(CC) -c $(LIB_DIR)/connection.c -o $(LIB_DIR)/connection.o $(CFLAGS)
 

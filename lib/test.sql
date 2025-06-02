@@ -1,7 +1,7 @@
 -- Example enum type definition
 CREATE TYPE status_enum AS ENUM ('active', 'inactive', 'pending');
 
-CREATE TABLE example_table (
+CREATE TABLE ExampleTable (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     
     -- Numeric types
