@@ -223,5 +223,5 @@ void CreateCRUDFilesFromSQL(
 
 int main()
 {
-  CreateCRUDFilesFromSQL("test.sql");
+  CreateCRUDFilesFromSQL("/home/mrjunejune/project/pog_pool/models/persons.sql");
 }
