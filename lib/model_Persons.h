@@ -11,6 +11,7 @@ typedef struct {
   char* city;
 } Persons;
 
+Persons* QueryPersons(PGconn* conn, const char* where_clause);
 void InsertPersons(PGconn* conn, Persons u);
 void UpdatePersons(PGconn* conn, Persons u, const char* where_clause);
 void DeletePersons(PGconn* conn, const char* where_clause);

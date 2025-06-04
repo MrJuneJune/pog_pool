@@ -1,5 +1,5 @@
 #include "connection.h"
-#include "Persons.h"
+#include "model_Persons.h"
 
 
 const char* ExecStatusTypeToString(ExecStatusType status)
@@ -30,41 +30,8 @@ int main()
   InitPool(connection_pool, "REMOVED_DB_URL");
   PGconn *pg_conn = BorrowConnection(connection_pool);
 
-  if (!pg_conn) {
-    printf("conn is NULL!\n");
-    exit(1);
-  }
-  printf("personid: %s\n", p.personid);
+  Persons* p = QueryPersons(pg_conn, "1=1");
+  printf("%s", p->personid);
 
-  InsertPersons(pg_conn, p);
-
-  PGresult *pg_result = PQexec(pg_conn, "select * from Persons;");
-  ExecStatusType status = PQresultStatus(pg_result);
-
-  // Get the number of rows and columns in the result
-  int nrows = PQntuples(pg_result);
-  int ncols = PQnfields(pg_result);
-
-  printf("Query returned %d rows and %d columns\n", nrows, ncols);
-
-  for (int row = 0; row < nrows; row++)
-  {
-    printf("Row %d:\n", row+1);
-    for (int col = 0; col < ncols; col++)
-    {
-      char *value = PQgetvalue(pg_result, row, col);
-      printf("\tColumn %d: %s\n", col + 1, value);
-    }
-  }
-
-  printf("Status: %s\n", ExecStatusTypeToString(status));
-
-  ReleaseConnection(connection_pool, pg_conn);
-
-  printf("Released \n");
-
-  ClosePool(connection_pool);
-
-  printf("Closed \n");
   return 0;
 }

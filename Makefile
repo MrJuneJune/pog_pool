@@ -3,6 +3,7 @@ CFLAGS = -Ilib -L. -lpq
 BIN_DIR = bin
 TEST_DIR = test
 LIB_DIR = lib
+MODEL_SRCS := $(wildcard $(LIB_DIR)/model_*.c)
 
 all: test debug
 
@@ -11,7 +12,7 @@ test: $(TEST_DIR)/benchmark_connection_pool.c $(LIB_DIR)/connection.o | $(BIN_DI
 	./$(BIN_DIR)/benchmark_pool
 
 debug: main.c $(LIB_DIR)/connection.o | $(BIN_DIR)
-	$(CC) main.c $(LIB_DIR)/Persons.c $(LIB_DIR)/connection.o $(CFLAGS) -o $(BIN_DIR)/main
+	$(CC) main.c $(MODEL_SRCS) $(LIB_DIR)/connection.o $(CFLAGS) -o $(BIN_DIR)/main
 
 auto_generate_sql: $(LIB_DIR)/auto_generate.c $(LIB_DIR)/auto_generate.h
 	$(CC) $(LIB_DIR)/auto_generate.c -o $(BIN_DIR)/auto_generate $(CFLAGS)

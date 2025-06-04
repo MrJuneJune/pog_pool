@@ -1,7 +1,5 @@
 #include "auto_generate.h"
 
-// This should be removed when we handle other keys
-#define CREATE_TABLE 13
 
 const char* SqlToCType(const char* sql_type)
 {
@@ -59,7 +57,8 @@ void CreateCRUDFiles(
   // Create header file
   snprintf(file_name, sizeof(file_name), "/home/mrjunejune/project/pog_pool/lib/model_%s.h", table_name);
   FILE *file_out_p = fopen(file_name, "w");
-  if (!file_out_p) {
+  if (!file_out_p)
+  {
     perror("fopen");
     return;
   }
@@ -68,11 +67,13 @@ void CreateCRUDFiles(
   fprintf(file_out_p, "#define MODEL_%s\n\n", table_name);
   fprintf(file_out_p, "#include <postgresql/libpq-fe.h>\n\n");
   fprintf(file_out_p, "typedef struct {\n");
-  for (size_t i = 0; i < column_sizes; i++) {
+  for (size_t i = 0; i < column_sizes; i++)
+  {
     const char *c_type = SqlToCType(columns[i].type);
     fprintf(file_out_p, "  %s %s;\n", c_type, columns[i].name);
   }
   fprintf(file_out_p, "} %s;\n\n",table_name);
+  fprintf(file_out_p, "%s* Query%s(PGconn* conn, const char* where_clause);\n", table_name, table_name);
   fprintf(file_out_p, "void Insert%s(PGconn* conn, %s u);\n", table_name, table_name);
   fprintf(file_out_p, "void Update%s(PGconn* conn, %s u, const char* where_clause);\n", table_name, table_name);
   fprintf(file_out_p, "void Delete%s(PGconn* conn, const char* where_clause);\n\n", table_name);
@@ -82,7 +83,8 @@ void CreateCRUDFiles(
   // Create source file 
   snprintf(file_name, sizeof(file_name), "/home/mrjunejune/project/pog_pool/lib/model_%s.c", table_name);
   file_out_p = fopen(file_name, "w");
-  if (!file_out_p) {
+  if (!file_out_p)
+  {
     perror("fopen");
     return;
   }
@@ -150,9 +152,43 @@ void CreateCRUDFiles(
   fprintf(file_out_p, "#include \"model_%s.h\"\n", table_name);
   fprintf(file_out_p, "#include <stdlib.h>\n#include <stdio.h>\n#include <string.h>\n\n");
 
+  // QUERY function
+  fprintf(file_out_p, "%s* Query%s(PGconn* conn, const char* where_clause)\n{\n", table_name, table_name);
+  fprintf(file_out_p, "  char query[%i];\n", QUERY_BUFFER);
+  fprintf(file_out_p, "  snprintf(query, sizeof(query), \"SELECT * FROM %s WHERE %%s;\", where_clause);\n", table_name);
+  fprintf(file_out_p, "  PGresult* res = PQexec(conn, query);\n");
+  
+  fprintf(file_out_p, "  if (PQresultStatus(res) != PGRES_TUPLES_OK) {\n");
+  fprintf(file_out_p, "    fprintf(stderr, \"SELECT failed: %%s\\n\", PQerrorMessage(conn));\n");
+  fprintf(file_out_p, "    PQclear(res);\n");
+  fprintf(file_out_p, "    return NULL;\n");
+  fprintf(file_out_p, "  }\n");
+  
+  fprintf(file_out_p, "  int rows = PQntuples(res);\n");
+  fprintf(file_out_p, "  %s* list = malloc(rows * sizeof(%s));\n", table_name, table_name);
+  fprintf(file_out_p, "  for (int i = 0; i < rows; ++i) {\n");
+  
+  for (size_t i = 0; i < column_sizes; i++) {
+    const char* name = columns[i].name;
+    const char* c_type = SqlToCType(columns[i].type);
+  
+    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0 || strcmp(c_type, "long long") == 0) {
+      fprintf(file_out_p, "    list[i].%s = atoi(PQgetvalue(res, i, %zu));\n", name, i);
+    } else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0) {
+      fprintf(file_out_p, "    list[i].%s = atof(PQgetvalue(res, i, %zu));\n", name, i);
+    } else {
+      fprintf(file_out_p, "    list[i].%s = strdup(PQgetvalue(res, i, %zu));\n", name, i);
+    }
+  }
+  
+  fprintf(file_out_p, "  }\n");
+  fprintf(file_out_p, "  PQclear(res);\n");
+  fprintf(file_out_p, "  return list;\n");
+  fprintf(file_out_p, "}\n\n");
+
   // INSERT function
-  fprintf(file_out_p, "void Insert%s(PGconn* conn, struct %s u)\n{\n", table_name, table_name);
-  fprintf(file_out_p, "  char query[1024];\n");
+  fprintf(file_out_p, "void Insert%s(PGconn* conn, %s u)\n{\n", table_name, table_name);
+  fprintf(file_out_p, "  char query[%i];\n", QUERY_BUFFER);
   fprintf(file_out_p, "  snprintf(query, sizeof(query),\n");
   fprintf(file_out_p, "    \"INSERT INTO %s %s \"\n    \"VALUES (%s);\",\n", table_name, column_names, format_parts);
   fprintf(file_out_p, "    %s);\n", value_args);
@@ -161,8 +197,8 @@ void CreateCRUDFiles(
   fprintf(file_out_p, "}\n\n");
 
   // UPDATE function
-  fprintf(file_out_p, "void Update%s(PGconn* conn, struct %s u, const char* where_clause)\n{\n", table_name, table_name);
-  fprintf(file_out_p, "  char query[1024];\n");
+  fprintf(file_out_p, "void Update%s(PGconn* conn, %s u, const char* where_clause)\n{\n", table_name, table_name);
+  fprintf(file_out_p, "  char query[%i];\n", QUERY_BUFFER);
 
   // Emit code to write query
   fprintf(file_out_p, "  snprintf(query, sizeof(query),\n");
@@ -175,7 +211,7 @@ void CreateCRUDFiles(
 
   // DELETE stub
   fprintf(file_out_p, "void Delete%s(PGconn* conn, const char* where_clause)\n{\n", table_name);
-  fprintf(file_out_p, "  char query[512];\n");
+  fprintf(file_out_p, "  char query[%i];\n", QUERY_BUFFER);
   fprintf(file_out_p, "  snprintf(query, sizeof(query),\n");
   fprintf(file_out_p, "    \"DELETE FROM %s WHERE %%s;\",\n", table_name);
   fprintf(file_out_p, "    where_clause);\n");

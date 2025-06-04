@@ -10,6 +10,10 @@
 #define TABLE_LEN 64 
 #define COLUNM_LEN 64 
 #define MAX_COLUNM_NUM 64 
+#define QUERY_BUFFER 1024
+
+// This should be removed when we handle other keys
+#define CREATE_TABLE 13
 #define IS_CREATE_TABLE(str) (strncmp(str, "CREATE TABLE", 12) == 0)
 
 
