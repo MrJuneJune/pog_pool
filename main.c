@@ -1,4 +1,6 @@
 #include "connection.h"
+#include "Persons.h"
+
 
 const char* ExecStatusTypeToString(ExecStatusType status)
 {
@@ -22,11 +24,19 @@ const char* ExecStatusTypeToString(ExecStatusType status)
 
 int main()
 {
-
-  ConnectionPool *connection_pool;
+  ConnectionPool connection_pool_real={0};
+  ConnectionPool* connection_pool = &connection_pool_real;
 
   InitPool(connection_pool, "REMOVED_DB_URL");
   PGconn *pg_conn = BorrowConnection(connection_pool);
+
+  if (!pg_conn) {
+    printf("conn is NULL!\n");
+    exit(1);
+  }
+  printf("personid: %s\n", p.personid);
+
+  InsertPersons(pg_conn, p);
 
   PGresult *pg_result = PQexec(pg_conn, "select * from Persons;");
   ExecStatusType status = PQresultStatus(pg_result);

@@ -1,9 +1,10 @@
-#include "Persons.h"
+#include "model_Persons.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
-void InsertPersons(PGconn* conn, struct Persons u) {
+void InsertPersons(PGconn* conn, struct Persons u)
+{
   char query[1024];
   snprintf(query, sizeof(query),
     "INSERT INTO Persons (personid, lastname, firstname, address, city) "
@@ -13,7 +14,8 @@ void InsertPersons(PGconn* conn, struct Persons u) {
   PQclear(res);
 }
 
-void UpdatePersons(PGconn* conn, struct Persons u, const char* where_clause) {
+void UpdatePersons(PGconn* conn, struct Persons u, const char* where_clause)
+{
   char query[1024];
   snprintf(query, sizeof(query),
     "UPDATE Persons "
@@ -23,7 +25,8 @@ void UpdatePersons(PGconn* conn, struct Persons u, const char* where_clause) {
   PQclear(res);
 }
 
-void DeletePersons(PGconn* conn, const char* where_clause) {
+void DeletePersons(PGconn* conn, const char* where_clause)
+{
   char query[512];
   snprintf(query, sizeof(query),
     "DELETE FROM Persons WHERE %s;",

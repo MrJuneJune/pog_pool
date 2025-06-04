@@ -1,6 +1,7 @@
 #include "connection.h" 
 
-void InitPool(ConnectionPool *pool, const char *conninfo) {
+void InitPool(ConnectionPool *pool, const char *conninfo)
+{
   for (int i = 0; i < MAX_CONNECTIONS; i++) {
     pool->connections[i] = NULL;
   }
@@ -16,7 +17,8 @@ void InitPool(ConnectionPool *pool, const char *conninfo) {
   }
 }
 
-PGconn* BorrowConnection(ConnectionPool *pool) {
+PGconn* BorrowConnection(ConnectionPool *pool)
+{
   if (pool->num_connections == 0)
   {
     printf("No available connections in the pool.\n");
@@ -33,7 +35,8 @@ PGconn* BorrowConnection(ConnectionPool *pool) {
   return conn;
 }
 
-void ReleaseConnection(ConnectionPool *pool, PGconn *conn) {
+void ReleaseConnection(ConnectionPool *pool, PGconn *conn)
+{
   if (pool->num_connections >= MAX_CONNECTIONS)
   {
     printf("Pool is full. Cannot release connection.\n");
@@ -43,7 +46,8 @@ void ReleaseConnection(ConnectionPool *pool, PGconn *conn) {
   pool->num_connections++;
 }
 
-void ClosePool(ConnectionPool *pool) {
+void ClosePool(ConnectionPool *pool)
+{
   for (int i = 0; i < pool->num_connections; i++) {
     PQfinish(pool->connections[i]);
   }
