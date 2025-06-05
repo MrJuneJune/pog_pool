@@ -1,4 +1,9 @@
 #include "auto_generate.h"
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
 
 
 const char* SqlToCType(const char* sql_type)
@@ -73,7 +78,13 @@ void CreateCRUDFiles(
     fprintf(file_out_p, "  %s %s;\n", c_type, columns[i].name);
   }
   fprintf(file_out_p, "} %s;\n\n",table_name);
-  fprintf(file_out_p, "%s* Query%s(PGconn* conn, const char* where_clause);\n", table_name, table_name);
+
+  fprintf(file_out_p, "typedef struct {\n");
+  fprintf(file_out_p, "  %s* %s;\n", table_name, table_name);
+  fprintf(file_out_p, "  ExecStatusType status;\n");
+  fprintf(file_out_p, "} %sQuery;\n\n", table_name);
+
+  fprintf(file_out_p, "%sQuery Query%s(PGconn* conn, const char* where_clause);\n", table_name, table_name);
   fprintf(file_out_p, "void Insert%s(PGconn* conn, %s u);\n", table_name, table_name);
   fprintf(file_out_p, "void Update%s(PGconn* conn, %s u, const char* where_clause);\n", table_name, table_name);
   fprintf(file_out_p, "void Delete%s(PGconn* conn, const char* where_clause);\n\n", table_name);
@@ -153,20 +164,28 @@ void CreateCRUDFiles(
   fprintf(file_out_p, "#include <stdlib.h>\n#include <stdio.h>\n#include <string.h>\n\n");
 
   // QUERY function
-  fprintf(file_out_p, "%s* Query%s(PGconn* conn, const char* where_clause)\n{\n", table_name, table_name);
+  fprintf(file_out_p, "%sQuery Query%s(PGconn* conn, const char* where_clause)\n{\n", table_name, table_name);
+  fprintf(file_out_p, "  %sQuery query_result;\n", table_name);
   fprintf(file_out_p, "  char query[%i];\n", QUERY_BUFFER);
   fprintf(file_out_p, "  snprintf(query, sizeof(query), \"SELECT * FROM %s WHERE %%s;\", where_clause);\n", table_name);
   fprintf(file_out_p, "  PGresult* res = PQexec(conn, query);\n");
-  
-  fprintf(file_out_p, "  if (PQresultStatus(res) != PGRES_TUPLES_OK) {\n");
+  fprintf(file_out_p, "  ExecStatusType status = PQresultStatus(res);");
+  fprintf(file_out_p, "  query_result.%s = NULL;\n", table_name);
+  fprintf(file_out_p, "  query_result.status = status;");
+  fprintf(file_out_p, "  if (status != PGRES_TUPLES_OK)\n  {\n");
   fprintf(file_out_p, "    fprintf(stderr, \"SELECT failed: %%s\\n\", PQerrorMessage(conn));\n");
   fprintf(file_out_p, "    PQclear(res);\n");
-  fprintf(file_out_p, "    return NULL;\n");
+  fprintf(file_out_p, "    return query_result;\n");
   fprintf(file_out_p, "  }\n");
   
   fprintf(file_out_p, "  int rows = PQntuples(res);\n");
+
+  fprintf(file_out_p, "   if (rows == 0)\n");
+  fprintf(file_out_p, "   {\n");
+  fprintf(file_out_p, "     return query_result;\n");
+  fprintf(file_out_p, "   }\n");
   fprintf(file_out_p, "  %s* list = malloc(rows * sizeof(%s));\n", table_name, table_name);
-  fprintf(file_out_p, "  for (int i = 0; i < rows; ++i) {\n");
+  fprintf(file_out_p, "  for (int i = 0; i < rows; ++i)\n  {\n");
   
   for (size_t i = 0; i < column_sizes; i++) {
     const char* name = columns[i].name;
@@ -183,7 +202,8 @@ void CreateCRUDFiles(
   
   fprintf(file_out_p, "  }\n");
   fprintf(file_out_p, "  PQclear(res);\n");
-  fprintf(file_out_p, "  return list;\n");
+  fprintf(file_out_p, "  query_result.%s = list;", table_name);
+  fprintf(file_out_p, "  return query_result;");
   fprintf(file_out_p, "}\n\n");
 
   // INSERT function
@@ -258,7 +278,81 @@ void CreateCRUDFilesFromSQL(
   CreateCRUDFiles(table_name, columns, curr_column_num);
 }
 
+void SetModelHeader(FILE *models_header)
+{
+  fprintf(models_header, "#ifndef MODELS_H\n#define MODELS_H\n\n");
+}
+
+pid_t* PIDStatus(
+  const char *model_dir,
+  const struct dirent *entry,
+  FILE *models_header
+)
+{
+   char full_path[512];
+   snprintf(full_path, sizeof(full_path), "%s/%s", model_dir, entry->d_name);
+   pid_t pid = fork();
+
+	 switch (pid)
+   {
+	   case -1:
+	       perror("fork");
+	       exit(EXIT_FAILURE);
+	   case 0:
+	       puts("Child exiting.");
+         char table_name[TABLE_LEN];
+         printf("%s: legnth: %d\n", entry->d_name, strcspn(entry->d_name, "."));
+         size_t len_name = strcspn(entry->d_name, ".");
+         strncpy(table_name, entry->d_name, len_name);
+         table_name[len_name] = '\0';
+         printf("%s\n", table_name);
+         fprintf(models_header, "#include \"model_%s.h\"\n", table_name);
+	       exit(3);
+	   default:
+	       printf("Child is PID %jd\n", (int) pid);
+         CreateCRUDFilesFromSQL(full_path);
+	       puts("Parent exiting.");
+	 }
+}
+
 int main()
 {
-  CreateCRUDFilesFromSQL("/home/mrjunejune/project/pog_pool/models/persons.sql");
+  FILE *models_header;
+  const char *model_dir = "/home/mrjunejune/project/pog_pool/models";
+  DIR *dir = opendir(model_dir);
+  struct dirent *entry;
+  models_header = fopen("/home/mrjunejune/project/pog_pool/lib/models.h", "w");
+  SetModelHeader(models_header);
+  fclose(models_header);
+
+  models_header = fopen("/home/mrjunejune/project/pog_pool/lib/models.h", "a");
+
+  DIR *dir_copy = dir;
+
+  while ((entry = readdir(dir)) != NULL)
+  {
+    // ignore vim
+    if (entry->d_type == DT_REG && strstr(entry->d_name, ".swp"))
+    {
+      continue;
+    }
+
+
+    if (entry->d_type == DT_REG && strstr(entry->d_name, ".sql"))
+    {
+      PIDStatus(model_dir, entry, models_header);
+    }
+  }
+
+  while (wait(NULL) > 0)
+  {
+    continue;
+  }
+
+  // close the parent headers.
+  fprintf(models_header, "\n#endif // MODELS_H\n");
+  fclose(models_header);
+  closedir(dir);
+  return 0;
 }
+

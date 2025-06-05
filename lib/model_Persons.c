@@ -3,19 +3,27 @@
 #include <stdio.h>
 #include <string.h>
 
-Persons* QueryPersons(PGconn* conn, const char* where_clause)
+PersonsQuery QueryPersons(PGconn* conn, const char* where_clause)
 {
+  PersonsQuery query_result;
   char query[1024];
   snprintf(query, sizeof(query), "SELECT * FROM Persons WHERE %s;", where_clause);
   PGresult* res = PQexec(conn, query);
-  if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+  ExecStatusType status = PQresultStatus(res);  query_result.Persons = NULL;
+  query_result.status = status;  if (status != PGRES_TUPLES_OK)
+  {
     fprintf(stderr, "SELECT failed: %s\n", PQerrorMessage(conn));
     PQclear(res);
-    return NULL;
+    return query_result;
   }
   int rows = PQntuples(res);
+   if (rows == 0)
+   {
+     return query_result;
+   }
   Persons* list = malloc(rows * sizeof(Persons));
-  for (int i = 0; i < rows; ++i) {
+  for (int i = 0; i < rows; ++i)
+  {
     list[i].personid = strdup(PQgetvalue(res, i, 0));
     list[i].lastname = strdup(PQgetvalue(res, i, 1));
     list[i].firstname = strdup(PQgetvalue(res, i, 2));
@@ -23,8 +31,7 @@ Persons* QueryPersons(PGconn* conn, const char* where_clause)
     list[i].city = strdup(PQgetvalue(res, i, 4));
   }
   PQclear(res);
-  return list;
-}
+  query_result.Persons = list;  return query_result;}
 
 void InsertPersons(PGconn* conn, Persons u)
 {

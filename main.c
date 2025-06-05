@@ -1,5 +1,5 @@
 #include "connection.h"
-#include "model_Persons.h"
+#include "models.h"
 
 
 const char* ExecStatusTypeToString(ExecStatusType status)
@@ -30,8 +30,14 @@ int main()
   InitPool(connection_pool, "REMOVED_DB_URL");
   PGconn *pg_conn = BorrowConnection(connection_pool);
 
-  Persons* p = QueryPersons(pg_conn, "1=1");
-  printf("%s", p->personid);
+  PersonsQuery p = QueryPersons(pg_conn, "1=1");
+  printf("%s\n", p.Persons->personid);
 
+  ExampleTableQuery et = {0};
+  et = QueryExampleTable(pg_conn, "1=1");
+  if (et.ExampleTable != NULL)
+  {
+    printf("%s\n", et.ExampleTable->id);
+  }
   return 0;
 }
