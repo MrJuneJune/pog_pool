@@ -54,3 +54,32 @@ void ClosePool(volatile ConnectionPool *pool)
   pool->num_connections = 0;
 }
 
+
+void RunSQLFile(PGconn *conn, const char *filename)
+{
+  FILE *file = fopen(filename, "r");
+  if (!file) {
+    perror("Failed to open SQL file");
+    exit(EXIT_FAILURE);
+  }
+
+  fseek(file, 0, SEEK_END);
+  long length = ftell(file);
+  rewind(file);
+
+  char *query = malloc(length + 1);
+  fread(query, 1, length, file);
+  query[length] = '\0';
+  fclose(file);
+
+  PGresult *res = PQexec(conn, query);
+  if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+    fprintf(stderr, "SQL execution failed: %s\n", PQerrorMessage(conn));
+    PQclear(res);
+    free(query);
+    exit(EXIT_FAILURE);
+  }
+
+  PQclear(res);
+  free(query);
+}

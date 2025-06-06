@@ -3,26 +3,36 @@
 
 const char* SqlToCType(const char *sql_type)
 {
-  if (strncmp(sql_type, "INT", 3) == 0 || strncmp(sql_type, "INTEGER", 7) == 0) return "int";
-  if (strncmp(sql_type, "SMALLINT", 8) == 0) return "short";
-  if (strncmp(sql_type, "BIGINT", 6) == 0) return "long long";
-  if (strncmp(sql_type, "UUID", 4) == 0) return "char*";
-  if (strncmp(sql_type, "VARCHAR", 7) == 0) return "char*";
-  if (strncmp(sql_type, "CHAR", 4) == 0) return "char*";
-  if (strncmp(sql_type, "TEXT", 4) == 0) return "char*";
-  if (strncmp(sql_type, "TIMESTAMP", 9) == 0) return "char*";
-  if (strncmp(sql_type, "DATE", 4) == 0) return "char*";
-  if (strncmp(sql_type, "TIME", 4) == 0) return "char*";
-  if (strncmp(sql_type, "BOOLEAN", 7) == 0 || strncmp(sql_type, "BOOL", 4) == 0) return "int";
-  if (strncmp(sql_type, "FLOAT", 5) == 0) return "float";
-  if (strncmp(sql_type, "DOUBLE", 6) == 0) return "double";
-  if (strncmp(sql_type, "DECIMAL", 7) == 0 || strncmp(sql_type, "NUMERIC", 7) == 0) return "double";
-  if (strncmp(sql_type, "JSON", 4) == 0 || strncmp(sql_type, "JSONB", 5) == 0) return "void*";
-  if (strncmp(sql_type, "BYTEA", 5) == 0) return "void*";
-  if (strncmp(sql_type, "ARRAY", 5) == 0) return "void*";
+  // Handle arrays first
+  if (strstr(sql_type, "[]") != NULL)
+    return "char*"; // Use char* to hold PostgreSQL array like "{1,2,3}"
 
-  // Default fallback
-  return "void*";
+  // Prefix matches for known types
+  if (strncmp(sql_type, "SMALLINT", 8) == 0) return "short";
+  if (strncmp(sql_type, "INTEGER", 7) == 0 || strncmp(sql_type, "INT", 3) == 0) return "int";
+  if (strncmp(sql_type, "BIGINT", 6) == 0) return "long long";
+
+  if (strncmp(sql_type, "DECIMAL", 7) == 0 || strncmp(sql_type, "NUMERIC", 7) == 0) return "double";
+  if (strncmp(sql_type, "REAL", 4) == 0) return "float";
+  if (strncmp(sql_type, "DOUBLE", 6) == 0) return "double";
+  if (strncmp(sql_type, "SERIAL", 6) == 0) return "void*";  // PostgreSQL auto-increment
+
+  if (strncmp(sql_type, "UUID", 4) == 0) return "char*";
+
+  if (strncmp(sql_type, "CHAR", 4) == 0 || strncmp(sql_type, "VARCHAR", 7) == 0 || strncmp(sql_type, "TEXT", 4) == 0)
+    return "char*";
+
+  if (strncmp(sql_type, "DATE", 4) == 0 || strncmp(sql_type, "TIME", 4) == 0 ||
+      strncmp(sql_type, "TIMESTAMP", 9) == 0 || strncmp(sql_type, "TIMESTAMPTZ", 11) == 0)
+    return "char*";
+
+  if (strncmp(sql_type, "BOOLEAN", 7) == 0 || strncmp(sql_type, "BOOL", 4) == 0) return "bool";
+
+  if (strncmp(sql_type, "JSON", 4) == 0 || strncmp(sql_type, "JSONB", 5) == 0) return "char*";
+  if (strncmp(sql_type, "BYTEA", 5) == 0) return "char*";
+
+  // Treat enums and unknown types as strings
+  return "char*";
 }
 
 char* SkipSpaces(char *p)
@@ -53,10 +63,11 @@ void CreateCRUDFiles(
 )
 {
   // TODO: Make this dynamic by counting length of the file?
-  char file_name[512];
+  char file_name[1024];
 
   // Create header file
   snprintf(file_name, sizeof(file_name), "%s/model_%s.h", output_folder, table_name);
+  printf("%s\n", file_name);
   FILE *file_out_p = fopen(file_name, "w");
   if (!file_out_p)
   {
@@ -66,7 +77,7 @@ void CreateCRUDFiles(
 
   fprintf(file_out_p, "#ifndef MODEL_%s\n", table_name);
   fprintf(file_out_p, "#define MODEL_%s\n\n", table_name);
-  fprintf(file_out_p, "#include <postgresql/libpq-fe.h>\n\n");
+  fprintf(file_out_p, "#include <postgresql/libpq-fe.h>\n#include <stdbool.h>\n\n");
   fprintf(file_out_p, "typedef struct {\n");
   for (size_t i = 0; i < column_sizes; i++)
   {
@@ -106,25 +117,53 @@ void CreateCRUDFiles(
   {
     const char *name = columns[i].name;
     const char *c_type = SqlToCType(columns[i].type);
-
+  
+    // Skip SERIAL (Postgres will auto-generate)
+    if (strcmp(columns[i].type, "SERIAL") == 0)
+      continue;
+  
     strcat(column_names, name);
-    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0 || strcmp(c_type, "long long") == 0)
+  
+    // Format string
+    if (strcmp(c_type, "short") == 0 || strcmp(c_type, "int") == 0)
     {
       strcat(format_parts, "%d");
+    }
+    else if (strcmp(c_type, "long long") == 0)
+    {
+      strcat(format_parts, "%lld");
     }
     else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0)
     {
       strcat(format_parts, "%f");
-    } 
+    }
+    else if (strcmp(c_type, "bool") == 0)
+    {
+      strcat(format_parts, "%s");
+    }
     else
     {
       strcat(format_parts, "'%s'");
     }
-
+  
+    // Add value argument
     char tmp[64];
-    snprintf(tmp, sizeof(tmp), "u.%s", name);
+    if (strcmp(c_type, "void*") == 0)
+    {
+      snprintf(tmp, sizeof(tmp), "(char*)u.%s", name);
+    }
+    else if (strcmp(c_type, "bool") == 0)
+    {
+      snprintf(tmp, sizeof(tmp), "u.%s ? \"TRUE\" : \"FALSE\"", name);
+    }
+    else
+    {
+      snprintf(tmp, sizeof(tmp), "u.%s", name);
+    }
+  
     strcat(value_args, tmp);
-
+  
+    // Trailing commas if not last
     if (i != column_sizes - 1)
     {
       strcat(column_names, ", ");
@@ -135,36 +174,50 @@ void CreateCRUDFiles(
   strcat(column_names, ")");
 
   // Build SET clause and format string
-  char set_clause[512] = {0};
-  char update_args[512] = {0};
-  for (size_t i = 0; i < column_sizes; i++)
+  char set_clause[1024] = {0};
+  char update_args[1024] = {0};
+  
+  for (size_t i = 0, written = 0; i < column_sizes; i++)
   {
     const char *name = columns[i].name;
     const char *c_type = SqlToCType(columns[i].type);
-
+  
+    // skip auto-generated
+    if (strncmp(columns[i].type, "SERIAL", 6) == 0) continue;
+  
+    // --- SET clause formatting ---
     char set_line[64];
-    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0 || strcmp(c_type, "long long") == 0)
-    {
+    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0) {
       snprintf(set_line, sizeof(set_line), "%s=%%d", name);
-    }
-    else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0)
-    {
+    } else if (strcmp(c_type, "long long") == 0) {
+      snprintf(set_line, sizeof(set_line), "%s=%%lld", name);
+    } else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0) {
       snprintf(set_line, sizeof(set_line), "%s=%%f", name);
-    }
-    else
-    {
+    } else if (strcmp(c_type, "bool") == 0) {
+      snprintf(set_line, sizeof(set_line), "%s=%%s", name);  // will pass "TRUE"/"FALSE"
+    } else {
       snprintf(set_line, sizeof(set_line), "%s='%%s'", name);
     }
-    strcat(set_clause, set_line);
-
+  
+    // --- Value argument formatting ---
     char arg_line[64];
-    snprintf(arg_line, sizeof(arg_line), "u.%s", name);
-    strcat(update_args, arg_line);
-
-    if (i != column_sizes - 1) {
+    if (strcmp(c_type, "bool") == 0) {
+      snprintf(arg_line, sizeof(arg_line), "u.%s ? \"TRUE\" : \"FALSE\"", name);
+    } else if (strcmp(c_type, "void*") == 0) {
+      snprintf(arg_line, sizeof(arg_line), "(char*)u.%s", name);
+    } else {
+      snprintf(arg_line, sizeof(arg_line), "u.%s", name);
+    }
+  
+    // --- Append to buffer ---
+    if (written > 0) {
       strcat(set_clause, ", ");
       strcat(update_args, ", ");
     }
+  
+    strcat(set_clause, set_line);
+    strcat(update_args, arg_line);
+    written++;
   }
 
   fprintf(file_out_p, "#include \"model_%s.h\"\n", table_name);
@@ -225,19 +278,22 @@ void CreateCRUDFiles(
   fprintf(file_out_p, "    \"INSERT INTO %s %s \"\n    \"VALUES (%s);\",\n", table_name, column_names, format_parts);
   fprintf(file_out_p, "    %s);\n", value_args);
   fprintf(file_out_p, "  PGresult *res = PQexec(conn, query);\n");
+  fprintf(file_out_p, "  if (PQresultStatus(res) != PGRES_COMMAND_OK) {\n");
+  fprintf(file_out_p, "    fprintf(stderr, \"Insert failed: %%s\\n\", PQerrorMessage(conn));\n");
+  fprintf(file_out_p, "  }\n");
   fprintf(file_out_p, "  PQclear(res);\n");
   fprintf(file_out_p, "}\n\n");
 
   // UPDATE function
   fprintf(file_out_p, "void Update%s(PGconn *conn, %s u, const char *where_clause)\n{\n", table_name, table_name);
   fprintf(file_out_p, "  char query[%i];\n", QUERY_BUFFER);
-
-  // Emit code to write query
   fprintf(file_out_p, "  snprintf(query, sizeof(query),\n");
-  fprintf(file_out_p, "    \"UPDATE %s \"\n    \"SET %s WHERE %%s;\",\n", table_name, set_clause);
+  fprintf(file_out_p, "    \"UPDATE %s SET %s WHERE %%s;\",\n", table_name, set_clause);
   fprintf(file_out_p, "    %s, where_clause);\n", update_args);
-
   fprintf(file_out_p, "  PGresult *res = PQexec(conn, query);\n");
+  fprintf(file_out_p, "  if (PQresultStatus(res) != PGRES_COMMAND_OK) {\n");
+  fprintf(file_out_p, "    fprintf(stderr, \"Update failed: %%s\\n\", PQerrorMessage(conn));\n");
+  fprintf(file_out_p, "  }\n");
   fprintf(file_out_p, "  PQclear(res);\n");
   fprintf(file_out_p, "}\n\n");
 
@@ -248,8 +304,11 @@ void CreateCRUDFiles(
   fprintf(file_out_p, "    \"DELETE FROM %s WHERE %%s;\",\n", table_name);
   fprintf(file_out_p, "    where_clause);\n");
   fprintf(file_out_p, "  PGresult *res = PQexec(conn, query);\n");
+  fprintf(file_out_p, "  if (PQresultStatus(res) != PGRES_COMMAND_OK) {\n");
+  fprintf(file_out_p, "    fprintf(stderr, \"Delete failed: %%s\\n\", PQerrorMessage(conn));\n");
+  fprintf(file_out_p, "  }\n");
   fprintf(file_out_p, "  PQclear(res);\n");
-  fprintf(file_out_p, "}\n");
+  fprintf(file_out_p, "}\n\n");
 
   fclose(file_out_p);
 } 
@@ -273,7 +332,7 @@ void CreateCRUDFilesFromSQL(
   {
    if (IS_CREATE_TABLE(line))
    { 
-     GetWord(line+CREATE_TABLE, table_name);
+     GetWord(line+CREATE_TABLE+14, table_name);
      is_in_table = 1;
      continue;
    }

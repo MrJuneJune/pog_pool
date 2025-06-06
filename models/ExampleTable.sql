@@ -1,9 +1,18 @@
--- Example enum type definition
-CREATE TYPE status_enum AS ENUM ('active', 'inactive', 'pending');
+-- For uui_generate_v4
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-CREATE TABLE ExampleTable (
+-- Create enum type only if it doesn't already exist
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'status_enum') THEN
+    CREATE TYPE status_enum AS ENUM ('active', 'inactive', 'pending');
+  END IF;
+END$$;
+
+-- Create table only if it doesn't already exist
+CREATE TABLE IF NOT EXISTS ExampleTable (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    
+
     -- Numeric types
     small_int_col SMALLINT,
     int_col INTEGER,
@@ -12,7 +21,7 @@ CREATE TABLE ExampleTable (
     numeric_col NUMERIC(15, 5),
     real_col REAL,
     double_col DOUBLE PRECISION,
-    serial_col SERIAL,  -- note: can't be used with UUID as PK
+    serial_col SERIAL,
 
     -- Character types
     char_col CHAR(10),
@@ -39,7 +48,7 @@ CREATE TABLE ExampleTable (
     int_array_col INTEGER[],
     text_array_col TEXT[],
 
-    -- Enum (you need to define the type first)
+    -- Enum
     status_col status_enum,
 
     -- Bytea (binary)
