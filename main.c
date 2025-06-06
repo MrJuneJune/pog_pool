@@ -1,5 +1,6 @@
-#include "connection.h"
-#include "models.h"
+#include "pog_pool/connection.h"
+#include "pog_pool/auto_generate.h"
+#include "build/models.h"
 
 
 const char* ExecStatusTypeToString(ExecStatusType status)

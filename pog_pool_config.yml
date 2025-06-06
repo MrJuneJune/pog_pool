@@ -1,0 +1,2 @@
+input_model_folder: ./models
+output_model_code_folder: ./build

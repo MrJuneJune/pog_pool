@@ -1,4 +1,4 @@
-#include "connection.h" 
+#include <pog_pool/connection.h>
 
 void InitPool(volatile ConnectionPool *pool, const char *conninfo)
 {

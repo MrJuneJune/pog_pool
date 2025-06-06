@@ -3,7 +3,7 @@
 #include <string.h>
 #include <time.h>
 #include <postgresql/libpq-fe.h>
-#include "connection.h"
+#include "pog_pool/connection.h"
 
 #define N_QUERIES 1000
 

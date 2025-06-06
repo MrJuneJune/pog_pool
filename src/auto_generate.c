@@ -1,12 +1,7 @@
-#include "auto_generate.h"
-#include <dirent.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
+#include "pog_pool/auto_generate.h"
 
 
-
-const char* SqlToCType(const char* sql_type)
+const char* SqlToCType(const char *sql_type)
 {
   if (strncmp(sql_type, "INT", 3) == 0 || strncmp(sql_type, "INTEGER", 7) == 0) return "int";
   if (strncmp(sql_type, "SMALLINT", 8) == 0) return "short";
@@ -30,13 +25,13 @@ const char* SqlToCType(const char* sql_type)
   return "void*";
 }
 
-char* SkipSpaces(char* p)
+char* SkipSpaces(char *p)
 {
   while (*p == ' ' || *p == '\t') p++;
   return p;
 }
 
-int GetWord(char* line, char* word)
+int GetWord(char *line, char *word)
 {
   int res = 0;
   while (*line != ' ' && *line != ',' && *line != '\0')
@@ -51,16 +46,17 @@ int GetWord(char* line, char* word)
 }
 
 void CreateCRUDFiles(
-  const char* table_name,
-  const Column* columns,
-  size_t column_sizes
+  const char *table_name,
+  const Column *columns,
+  size_t column_sizes,
+  const char *output_folder
 )
 {
   // TODO: Make this dynamic by counting length of the file?
   char file_name[512];
 
   // Create header file
-  snprintf(file_name, sizeof(file_name), "/home/mrjunejune/project/pog_pool/lib/model_%s.h", table_name);
+  snprintf(file_name, sizeof(file_name), "%s/model_%s.h", output_folder, table_name);
   FILE *file_out_p = fopen(file_name, "w");
   if (!file_out_p)
   {
@@ -84,15 +80,15 @@ void CreateCRUDFiles(
   fprintf(file_out_p, "  ExecStatusType status;\n");
   fprintf(file_out_p, "} %sQuery;\n\n", table_name);
 
-  fprintf(file_out_p, "%sQuery Query%s(PGconn* conn, const char* where_clause);\n", table_name, table_name);
-  fprintf(file_out_p, "void Insert%s(PGconn* conn, %s u);\n", table_name, table_name);
-  fprintf(file_out_p, "void Update%s(PGconn* conn, %s u, const char* where_clause);\n", table_name, table_name);
-  fprintf(file_out_p, "void Delete%s(PGconn* conn, const char* where_clause);\n\n", table_name);
+  fprintf(file_out_p, "%sQuery Query%s(PGconn *conn, const char *where_clause);\n", table_name, table_name);
+  fprintf(file_out_p, "void Insert%s(PGconn *conn, %s u);\n", table_name, table_name);
+  fprintf(file_out_p, "void Update%s(PGconn *conn, %s u, const char *where_clause);\n", table_name, table_name);
+  fprintf(file_out_p, "void Delete%s(PGconn *conn, const char *where_clause);\n\n", table_name);
   fprintf(file_out_p, "#endif // MODEL_%s\n", table_name);
   fclose(file_out_p);
 
   // Create source file 
-  snprintf(file_name, sizeof(file_name), "/home/mrjunejune/project/pog_pool/lib/model_%s.c", table_name);
+  snprintf(file_name, sizeof(file_name), "%s/model_%s.c", output_folder, table_name);
   file_out_p = fopen(file_name, "w");
   if (!file_out_p)
   {
@@ -108,15 +104,20 @@ void CreateCRUDFiles(
   strcat(column_names, "(");
   for (size_t i = 0; i < column_sizes; i++)
   {
-    const char* name = columns[i].name;
-    const char* c_type = SqlToCType(columns[i].type);
+    const char *name = columns[i].name;
+    const char *c_type = SqlToCType(columns[i].type);
 
     strcat(column_names, name);
-    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0 || strcmp(c_type, "long long") == 0) {
+    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0 || strcmp(c_type, "long long") == 0)
+    {
       strcat(format_parts, "%d");
-    } else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0) {
+    }
+    else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0)
+    {
       strcat(format_parts, "%f");
-    } else {
+    } 
+    else
+    {
       strcat(format_parts, "'%s'");
     }
 
@@ -124,7 +125,8 @@ void CreateCRUDFiles(
     snprintf(tmp, sizeof(tmp), "u.%s", name);
     strcat(value_args, tmp);
 
-    if (i != column_sizes - 1) {
+    if (i != column_sizes - 1)
+    {
       strcat(column_names, ", ");
       strcat(format_parts, ", ");
       strcat(value_args, ", ");
@@ -137,15 +139,20 @@ void CreateCRUDFiles(
   char update_args[512] = {0};
   for (size_t i = 0; i < column_sizes; i++)
   {
-    const char* name = columns[i].name;
-    const char* c_type = SqlToCType(columns[i].type);
+    const char *name = columns[i].name;
+    const char *c_type = SqlToCType(columns[i].type);
 
     char set_line[64];
-    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0 || strcmp(c_type, "long long") == 0) {
+    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0 || strcmp(c_type, "long long") == 0)
+    {
       snprintf(set_line, sizeof(set_line), "%s=%%d", name);
-    } else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0) {
+    }
+    else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0)
+    {
       snprintf(set_line, sizeof(set_line), "%s=%%f", name);
-    } else {
+    }
+    else
+    {
       snprintf(set_line, sizeof(set_line), "%s='%%s'", name);
     }
     strcat(set_clause, set_line);
@@ -164,11 +171,11 @@ void CreateCRUDFiles(
   fprintf(file_out_p, "#include <stdlib.h>\n#include <stdio.h>\n#include <string.h>\n\n");
 
   // QUERY function
-  fprintf(file_out_p, "%sQuery Query%s(PGconn* conn, const char* where_clause)\n{\n", table_name, table_name);
+  fprintf(file_out_p, "%sQuery Query%s(PGconn *conn, const char *where_clause)\n{\n", table_name, table_name);
   fprintf(file_out_p, "  %sQuery query_result;\n", table_name);
   fprintf(file_out_p, "  char query[%i];\n", QUERY_BUFFER);
   fprintf(file_out_p, "  snprintf(query, sizeof(query), \"SELECT * FROM %s WHERE %%s;\", where_clause);\n", table_name);
-  fprintf(file_out_p, "  PGresult* res = PQexec(conn, query);\n");
+  fprintf(file_out_p, "  PGresult *res = PQexec(conn, query);\n");
   fprintf(file_out_p, "  ExecStatusType status = PQresultStatus(res);");
   fprintf(file_out_p, "  query_result.%s = NULL;\n", table_name);
   fprintf(file_out_p, "  query_result.status = status;");
@@ -188,14 +195,19 @@ void CreateCRUDFiles(
   fprintf(file_out_p, "  for (int i = 0; i < rows; ++i)\n  {\n");
   
   for (size_t i = 0; i < column_sizes; i++) {
-    const char* name = columns[i].name;
-    const char* c_type = SqlToCType(columns[i].type);
+    const char *name = columns[i].name;
+    const char *c_type = SqlToCType(columns[i].type);
   
-    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0 || strcmp(c_type, "long long") == 0) {
+    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0 || strcmp(c_type, "long long") == 0)
+    {
       fprintf(file_out_p, "    list[i].%s = atoi(PQgetvalue(res, i, %zu));\n", name, i);
-    } else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0) {
+    } 
+    else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0)
+    {
       fprintf(file_out_p, "    list[i].%s = atof(PQgetvalue(res, i, %zu));\n", name, i);
-    } else {
+    }
+    else
+    {
       fprintf(file_out_p, "    list[i].%s = strdup(PQgetvalue(res, i, %zu));\n", name, i);
     }
   }
@@ -207,17 +219,17 @@ void CreateCRUDFiles(
   fprintf(file_out_p, "}\n\n");
 
   // INSERT function
-  fprintf(file_out_p, "void Insert%s(PGconn* conn, %s u)\n{\n", table_name, table_name);
+  fprintf(file_out_p, "void Insert%s(PGconn *conn, %s u)\n{\n", table_name, table_name);
   fprintf(file_out_p, "  char query[%i];\n", QUERY_BUFFER);
   fprintf(file_out_p, "  snprintf(query, sizeof(query),\n");
   fprintf(file_out_p, "    \"INSERT INTO %s %s \"\n    \"VALUES (%s);\",\n", table_name, column_names, format_parts);
   fprintf(file_out_p, "    %s);\n", value_args);
-  fprintf(file_out_p, "  PGresult* res = PQexec(conn, query);\n");
+  fprintf(file_out_p, "  PGresult *res = PQexec(conn, query);\n");
   fprintf(file_out_p, "  PQclear(res);\n");
   fprintf(file_out_p, "}\n\n");
 
   // UPDATE function
-  fprintf(file_out_p, "void Update%s(PGconn* conn, %s u, const char* where_clause)\n{\n", table_name, table_name);
+  fprintf(file_out_p, "void Update%s(PGconn *conn, %s u, const char *where_clause)\n{\n", table_name, table_name);
   fprintf(file_out_p, "  char query[%i];\n", QUERY_BUFFER);
 
   // Emit code to write query
@@ -225,17 +237,17 @@ void CreateCRUDFiles(
   fprintf(file_out_p, "    \"UPDATE %s \"\n    \"SET %s WHERE %%s;\",\n", table_name, set_clause);
   fprintf(file_out_p, "    %s, where_clause);\n", update_args);
 
-  fprintf(file_out_p, "  PGresult* res = PQexec(conn, query);\n");
+  fprintf(file_out_p, "  PGresult *res = PQexec(conn, query);\n");
   fprintf(file_out_p, "  PQclear(res);\n");
   fprintf(file_out_p, "}\n\n");
 
   // DELETE stub
-  fprintf(file_out_p, "void Delete%s(PGconn* conn, const char* where_clause)\n{\n", table_name);
+  fprintf(file_out_p, "void Delete%s(PGconn *conn, const char *where_clause)\n{\n", table_name);
   fprintf(file_out_p, "  char query[%i];\n", QUERY_BUFFER);
   fprintf(file_out_p, "  snprintf(query, sizeof(query),\n");
   fprintf(file_out_p, "    \"DELETE FROM %s WHERE %%s;\",\n", table_name);
   fprintf(file_out_p, "    where_clause);\n");
-  fprintf(file_out_p, "  PGresult* res = PQexec(conn, query);\n");
+  fprintf(file_out_p, "  PGresult *res = PQexec(conn, query);\n");
   fprintf(file_out_p, "  PQclear(res);\n");
   fprintf(file_out_p, "}\n");
 
@@ -243,7 +255,8 @@ void CreateCRUDFiles(
 } 
 
 void CreateCRUDFilesFromSQL(
-  const char *sql_file_name
+  const char *sql_file_name,
+  const char *output_folder
 )
 {
   FILE *fp; 
@@ -275,7 +288,7 @@ void CreateCRUDFilesFromSQL(
      curr_column_num++;
    }
   }
-  CreateCRUDFiles(table_name, columns, curr_column_num);
+  CreateCRUDFiles(table_name, columns, curr_column_num, output_folder);
 }
 
 void SetModelHeader(FILE *models_header)
@@ -286,7 +299,8 @@ void SetModelHeader(FILE *models_header)
 pid_t* PIDStatus(
   const char *model_dir,
   const struct dirent *entry,
-  FILE *models_header
+  FILE *models_header,
+  const char *output_folder
 )
 {
    char full_path[512];
@@ -310,49 +324,105 @@ pid_t* PIDStatus(
 	       exit(3);
 	   default:
 	       printf("Child is PID %jd\n", (int) pid);
-         CreateCRUDFilesFromSQL(full_path);
+         CreateCRUDFilesFromSQL(full_path, output_folder);
 	       puts("Parent exiting.");
 	 }
 }
 
-int main()
+void EnsureDefaultConfig(const char *config_path)
 {
-  FILE *models_header;
-  const char *model_dir = "/home/mrjunejune/project/pog_pool/models";
-  DIR *dir = opendir(model_dir);
-  struct dirent *entry;
-  models_header = fopen("/home/mrjunejune/project/pog_pool/lib/models.h", "w");
-  SetModelHeader(models_header);
-  fclose(models_header);
+  FILE *file = fopen(config_path, "w");
+  if (file == NULL) {
+    perror("Failed to create config");
+    exit(1);
+  }
+  fprintf(file, "input_model_folder: ./models\n");
+  fprintf(file, "output_model_folder: ./models\n");
+  fclose(file);
+}
 
-  models_header = fopen("/home/mrjunejune/project/pog_pool/lib/models.h", "a");
-
-  DIR *dir_copy = dir;
-
-  while ((entry = readdir(dir)) != NULL)
+void ParseConfig(const char *config_path, PogPoolConfig *config)
+{
+  FILE *file = fopen(config_path, "r");
+  if (!file)
   {
-    // ignore vim
-    if (entry->d_type == DT_REG && strstr(entry->d_name, ".swp"))
+    EnsureDefaultConfig(config_path);
+    file = fopen(config_path, "r");
+    if (!file)
     {
-      continue;
-    }
-
-
-    if (entry->d_type == DT_REG && strstr(entry->d_name, ".sql"))
-    {
-      PIDStatus(model_dir, entry, models_header);
+      perror("Cannot open config file after creating it");
+      exit(1);
     }
   }
 
+  char line[512];
+  while (fgets(line, sizeof(line), file)) {
+    char *key = strtok(line, ":");
+    char *value = SkipSpaces(strtok(NULL, "\n"));
+    if (key && value)
+    {
+      if (strcmp(key, "input_model_folder") == 0)
+      {
+        strncpy(config->input_dir, value, DIR_LEN);
+      }
+      else if (strcmp(key, "output_model_code_folder") == 0)
+      {
+        strncpy(config->output_dir, value, DIR_LEN);
+        sprintf(config->output_file, "%s/models.h", config->output_dir);
+      }
+      else if (strcmp(key, "database_url") == 0)
+      {
+        strncpy(config->database_url, value, DATABASE_URL_LEN);
+      }
+    }
+  }
+
+  fclose(file);
+}
+
+void GenerateModelFilesFromConfig()
+{
+  const char *config_path = "pog_pool_config.yml";
+  PogPoolConfig pogPoolConfig = {0};
+
+  ParseConfig(config_path, &pogPoolConfig);
+
+  DIR *dir = opendir(pogPoolConfig.input_dir);
+  if (!dir)
+  {
+    perror("Failed to open input directory");
+    return;
+  }
+
+  FILE *models_header = fopen(pogPoolConfig.output_file, "w");
+  if (!models_header)
+  {
+    printf("%s\n", pogPoolConfig.output_file);
+    perror("Failed to open output file");
+    closedir(dir);
+    return;
+  }
+
+  SetModelHeader(models_header);
+  fclose(models_header);
+  models_header = fopen(pogPoolConfig.output_file, "a");
+
+  struct dirent *entry;
+  while ((entry = readdir(dir)) != NULL)
+  {
+    if (entry->d_type == DT_REG && strstr(entry->d_name, ".swp")) continue;
+    if (entry->d_type == DT_REG && strstr(entry->d_name, ".sql")) {
+      PIDStatus(pogPoolConfig.input_dir, entry, models_header, pogPoolConfig.output_dir);
+    }
+  }
+
+  // Wait for all child process to finish..
   while (wait(NULL) > 0)
   {
     continue;
   }
 
-  // close the parent headers.
   fprintf(models_header, "\n#endif // MODELS_H\n");
   fclose(models_header);
   closedir(dir);
-  return 0;
 }
-
