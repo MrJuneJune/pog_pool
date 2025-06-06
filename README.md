@@ -1,7 +1,8 @@
 # PogPool
 
-![PogPool logo](./pog_pool_logo.png)
-
+<p align="center">
+  <img src="/pog_pool_logo.png" width="400" height="400" alt="PogPool Logo"/>
+</p>
 **PogPool** is a super simple C library for PostgreSQL connection pooling and auto-generating basic CRUD operations from SQL table definitions. It provides a simple, fast, and dependency-free way to interact with PostgreSQL using generated C structs and functions.
 
 ## Motivation
