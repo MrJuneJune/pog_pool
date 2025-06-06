@@ -22,10 +22,12 @@ const char* ExecStatusTypeToString(ExecStatusType status)
   }
 }
 
+volatile ConnectionPool* connection_pool;
+
 int main()
 {
   ConnectionPool connection_pool_real={0};
-  ConnectionPool* connection_pool = &connection_pool_real;
+  connection_pool = &connection_pool_real;
 
   InitPool(connection_pool, "REMOVED_DB_URL");
   PGconn *pg_conn = BorrowConnection(connection_pool);
