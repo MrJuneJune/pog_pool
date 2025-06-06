@@ -5,3 +5,6 @@ vim_session
 # make
 bin/
 build/
+
+# release
+dist/

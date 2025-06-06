@@ -1,5 +1,7 @@
 # PogPool
 
+![PogPool logo](./pog_pool.png)
+
 **PogPool** is a super simple C library for PostgreSQL connection pooling and auto-generating basic CRUD operations from SQL table definitions. It provides a simple, fast, and dependency-free way to interact with PostgreSQL using generated C structs and functions.
 
 ## Motivation
@@ -8,15 +10,15 @@ Just wanted to make a simple SQL connection pooler, then I got carried about wit
 
 ## Key Feature
 
-### Requirements 
-
-- gcc
-- libpq
-
 * Simple connection pool for PostgreSQL using only `libpq`.
 * uto-generates `INSERT`, `SELECT`, `UPDATE`, and `DELETE` C functions from SQL table schemas
 * Lightweight alternative to PgBouncer/PGPool
 * Naive metaprogramming that maps SQL types to C structs for rapid prototyping
+
+## Requirements 
+
+- gcc
+- libpq
 
 ## How to get started 
 
