@@ -1,2 +1,3 @@
+database_url: REMOVED_DB_URL
 input_model_folder: ./models
 output_model_code_folder: ./build

@@ -27,10 +27,15 @@ volatile ConnectionPool* connection_pool;
 
 int main()
 {
+  const char *config_path = "pog_pool_config.yml";
+  PogPoolConfig pogPoolConfig = {0};
+
+  ParseConfig(config_path, &pogPoolConfig);
+
   ConnectionPool connection_pool_real={0};
   connection_pool = &connection_pool_real;
 
-  InitPool(connection_pool, "REMOVED_DB_URL");
+  InitPool(connection_pool, pogPoolConfig.database_url);
   PGconn *pg_conn = BorrowConnection(connection_pool);
 
   PersonsQuery p = QueryPersons(pg_conn, "1=1");
