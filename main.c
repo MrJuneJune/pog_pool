@@ -89,12 +89,13 @@ int main()
   
     printf("status_col: %s\n", (char*)e->status_col);
     printf("file_col (hex): %s\n", (char*)e->file_col);
+
+    printf("\n\nSerialized: %s\n", SerializeExampleTable(*et.ExampleTable));
   }
   else
   {
     printf("Does not exist...\n");
   }
-
   char where_clause[512];
   sprintf(where_clause, "id = \'%s\'", example.id);
   DeleteExampleTable(pg_conn, where_clause);

@@ -95,6 +95,7 @@ void CreateCRUDFiles(
   fprintf(file_out_p, "void Insert%s(PGconn *conn, %s u);\n", table_name, table_name);
   fprintf(file_out_p, "void Update%s(PGconn *conn, %s u, const char *where_clause);\n", table_name, table_name);
   fprintf(file_out_p, "void Delete%s(PGconn *conn, const char *where_clause);\n\n", table_name);
+  fprintf(file_out_p, "char* Serialize%s(%s u);\n", table_name, table_name);
   fprintf(file_out_p, "#endif // MODEL_%s\n", table_name);
   fclose(file_out_p);
 
@@ -310,6 +311,58 @@ void CreateCRUDFiles(
   fprintf(file_out_p, "  PQclear(res);\n");
   fprintf(file_out_p, "}\n\n");
 
+  // Serialize stub
+  fprintf(file_out_p, "char* Serialize%s(%s u)\n{\n", table_name, table_name);
+  fprintf(file_out_p, "  char *buffer = malloc(%d);\n", QUERY_BUFFER * 2);
+  fprintf(file_out_p, "  if (!buffer) return NULL;\n");
+  fprintf(file_out_p, "  snprintf(buffer, %d,\n", QUERY_BUFFER * 2);
+  fprintf(file_out_p, "    \"{");
+  for (size_t i = 0; i < column_sizes; i++) {
+    const char *name = columns[i].name;
+    const char *c_type = SqlToCType(columns[i].type);
+    const char *sql_type = columns[i].type;
+  
+    // JSON key
+    fprintf(file_out_p, "\\\"%s\\\":", name);
+  
+    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0) {
+      fprintf(file_out_p, "%%d");
+    } else if (strcmp(c_type, "long long") == 0) {
+      fprintf(file_out_p, "%%lld");
+    } else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0) {
+      fprintf(file_out_p, "%%f");
+    } else if (strcmp(c_type, "bool") == 0) {
+      fprintf(file_out_p, "%%s"); // will insert "true" or "false"
+    } else if (strncmp(sql_type, "JSON", 4) == 0 || strncmp(sql_type, "JSONB", 5) == 0) {
+      fprintf(file_out_p, "%%s"); // inline raw json
+    } else if (strstr(sql_type, "[]") != NULL) {
+      fprintf(file_out_p, "%%s"); // formatted as a JSON array
+    } else {
+      fprintf(file_out_p, "\\\"%%s\\\""); // wrap plain strings
+    }
+  
+    if (i != column_sizes - 1) fprintf(file_out_p, ", ");
+  }
+  fprintf(file_out_p, "}\",\n");
+  for (size_t i = 0; i < column_sizes; i++) {
+    const char *name = columns[i].name;
+    const char *c_type = SqlToCType(columns[i].type);
+    const char *sql_type = columns[i].type;
+  
+    if (strcmp(c_type, "bool") == 0) {
+      fprintf(file_out_p, "    u.%s ? \"true\" : \"false\"", name);
+    } else if (strstr(sql_type, "[]") != NULL) {
+      // inline conversion: {1,2,3} -> [1,2,3]
+      fprintf(file_out_p, "    ({ const char *src = u.%s; size_t len = strlen(src); char *tmp = malloc(len + 3); if (!tmp) tmp = \"[]\"; else { tmp[0] = '['; strncpy(tmp + 1, src + 1, len - 2); tmp[len - 1] = ']'; tmp[len] = '\\0'; } tmp; })", name);
+    } else if (strcmp(c_type, "void*") == 0 || strncmp(sql_type, "JSON", 4) == 0 || strncmp(sql_type, "JSONB", 5) == 0) {
+      fprintf(file_out_p, "    (char*)u.%s", name);
+    } else {
+      fprintf(file_out_p, "    u.%s", name);
+    }
+  
+    if (i != column_sizes - 1) fprintf(file_out_p, ",\n");
+  }
+  fprintf(file_out_p, "  );\n  return buffer;\n}\n");
   fclose(file_out_p);
 } 
 
