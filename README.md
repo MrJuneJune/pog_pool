@@ -41,7 +41,7 @@ You can update `pog_pool_config.yml` file to route to your own db or different i
 3. Link against `libpq` and `pog_pool` and call the generated CRUD functions in your app.
 4. Connection pooling is handled via `InitPool()` / `BorrowConnection()` / `ReleaseConnection()` in `pog_pool` or you cna directly use PGConn* types.
 
-## 📋 TODO
+## TODO
 
 * [ ] Foreign key and join-based CRUD generation
 * [ ] Optional: lightweight migration/versioning support (maybe!)
