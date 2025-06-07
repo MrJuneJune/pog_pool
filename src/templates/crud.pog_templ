@@ -53,7 +53,7 @@ void Insert{{STRUCT_NAME}}(PGconn *conn, {{STRUCT_NAME}} u)
 
 void Update{{STRUCT_NAME}}(PGconn *conn, {{STRUCT_NAME}} u, const char *where_clause)
 {
-  char query[{{QUERY_BUFFER}}];
+  char query[10000] = {0};
   snprintf(query, sizeof(query),
     "UPDATE {{TABLE_NAME}} SET {{SET_CLAUSE}} WHERE %s;",
     {{UPDATE_ARGS}}, where_clause);

@@ -54,7 +54,7 @@ char* CRUD_SRC_TEMPLATE =
 "\n"
 "void Update{{STRUCT_NAME}}(PGconn *conn, {{STRUCT_NAME}} u, const char *where_clause)\n"
 "{\n"
-"  char query[{{QUERY_BUFFER}}];\n"
+"  char query[10000] = {0};\n"
 "  snprintf(query, sizeof(query),\n"
 "    \"UPDATE {{TABLE_NAME}} SET {{SET_CLAUSE}} WHERE %s;\",\n"
 "    {{UPDATE_ARGS}}, where_clause);\n"

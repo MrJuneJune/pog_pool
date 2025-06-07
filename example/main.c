@@ -51,12 +51,14 @@ int main()
     .status_col = "active",
     .file_col = "\\x68656c6c6f" 
   };
-  
+
+  printf("\n\n\n---INSERT---\n\n\n");
   InsertExampleTable(pg_conn, example);
 
   ExampleTableQuery et;
   ExampleTable* e;
 
+  printf("\n\n\n---QUERY ALL---\n\n\n");
   et = QueryExampleTable(pg_conn, "*", "1=1");
   if (et.ExampleTable != NULL)
   {
@@ -93,58 +95,29 @@ int main()
   
     printf("status_col: %s\n", (char*)e->status_col);
     printf("file_col (hex): %s\n", (char*)e->file_col);
-
-    printf("\n\nSerialized: %s\n", SerializeExampleTable(*et.ExampleTable));
   }
   else
   {
     printf("Does not exist...\n");
   }
 
-  // ID only
-  printf("ID ONLY\n\n\n");
-  et = QueryExampleTable(pg_conn, "id", "1=1");
+  // Update and get name 
+  printf("\n\n\n---UPDATE---\n\n\n");
+  e->char_col = "updated";
+  UpdateExampleTable(pg_conn, *e, "id=\'b6d4c431-f327-4a4a-9345-320aa3cd7e51\'");
+  printf("Query only updated value\n");
+  et = QueryExampleTable(pg_conn, "char_col", "1=1");
   if (et.ExampleTable != NULL)
   {
-    e = et.ExampleTable;
-  
-    printf("id: %s\n", e->id);
-    printf("small_int_col: %d\n", e->small_int_col);
-    printf("int_col: %d\n", e->int_col);
-    printf("big_int_col: %lld\n", e->big_int_col);
-    printf("decimal_col: %.2f\n", e->decimal_col);
-    printf("numeric_col: %.3f\n", e->numeric_col);
-    printf("real_col: %i\n", e->real_col);  // stored as string
-    printf("double_col: %f\n", e->double_col);
-    // serial_col is auto-generated — skip or print if needed
-    // printf("serial_col: %s\n", (char*)e->serial_col);
-  
-    printf("char_col: %s\n", e->char_col);
-    printf("varchar_col: %s\n", e->varchar_col);
-    printf("text_col: %s\n", e->text_col);
-  
-    printf("date_col: %s\n", e->date_col);
-    printf("time_col: %s\n", e->time_col);
-    printf("timestamp_col: %s\n", e->timestamp_col);
-    printf("timestamptz_col: %s\n", e->timestamptz_col);
-  
-    printf("boolean_col: %s\n", e->boolean_col ? "TRUE" : "FALSE");
-    printf("another_uuid: %s\n", e->another_uuid);
-  
-    printf("json_col: %s\n", (char*)e->json_col);
-    printf("jsonb_col: %s\n", (char*)e->jsonb_col);
-  
-    printf("int_array_col: %s\n", e->int_array_col);
-    printf("text_array_col: %s\n", e->text_array_col);
-  
-    printf("status_col: %s\n", (char*)e->status_col);
-    printf("file_col (hex): %s\n", (char*)e->file_col);
-
-    printf("\n\nSerialized: %s\n", SerializeExampleTable(*et.ExampleTable));
+    printf("char_col: %s", et.ExampleTable->char_col);
   }
 
+  printf("\n\n\n--- Serialized it ---\n\n\n");
+  printf("Result: %s\n", SerializeExampleTable(*e));
+
+
   char where_clause[512];
-  sprintf(where_clause, "id = \'%s\'", example.id);
+  sprintf(where_clause, "id = \'%s\'\n", example.id);
   DeleteExampleTable(pg_conn, where_clause);
   
   return 0;

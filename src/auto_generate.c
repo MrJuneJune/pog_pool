@@ -201,7 +201,9 @@ void BuildAllCodegenPieces(const Column* columns, size_t count, const char* tabl
 
     // --- set_clause ---
     if (!first_update) strcat(out->set_clause, ", ");
-    if (strcmp(c_type, "long long") == 0)
+    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0)
+      sprintf(out->set_clause + strlen(out->set_clause), "%s=%%d", name);
+    else if (strcmp(c_type, "long long") == 0)
       sprintf(out->set_clause + strlen(out->set_clause), "%s=%%lld", name);
     else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0)
       sprintf(out->set_clause + strlen(out->set_clause), "%s=%%f", name);
