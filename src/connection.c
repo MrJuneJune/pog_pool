@@ -24,15 +24,7 @@ PGconn* BorrowConnection(volatile ConnectionPool *pool)
     printf("No available connections in the pool.\n");
     return NULL;
   }
-  PGconn *conn = pool->connections[0];
-  
-  for (int i = 0; i < pool->num_connections - 1; i++) 
-  {
-    pool->connections[i] = pool->connections[i + 1];
-  }
-  pool->num_connections--;
-  
-  return conn;
+  return pool->connections[--pool->num_connections];
 }
 
 void ReleaseConnection(volatile ConnectionPool *pool, PGconn *conn)
@@ -42,8 +34,7 @@ void ReleaseConnection(volatile ConnectionPool *pool, PGconn *conn)
     printf("Pool is full. Cannot release connection.\n");
     return;
   }
-  pool->connections[pool->num_connections] = conn;
-  pool->num_connections++;
+  pool->connections[pool->num_connections++] = conn;
 }
 
 void ClosePool(volatile ConnectionPool *pool)

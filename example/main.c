@@ -1,6 +1,6 @@
 #include "pog_pool/connection.h"
 #include "pog_pool/auto_generate.h"
-#include "build/models.h"
+#include "../build/models.h"
 
 volatile ConnectionPool* connection_pool;
 

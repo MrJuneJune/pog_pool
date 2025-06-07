@@ -7,7 +7,8 @@
 
 #define N_QUERIES 1000
 
-const char *CONNINFO = "REMOVED_DB_URL";
+// This can be from 
+const char *CONNINFO = "postgres://pog_pool:pog_pool@localhost:4269/pog_pool";
 
 double NowSeconds() {
   struct timespec ts;
@@ -16,14 +17,11 @@ double NowSeconds() {
 }
 
 void RunQuery(PGconn *conn) {
-  PGresult *res = PQexec(conn, "select * from Persons;");
+  PGresult *res = PQexec(conn, "SELECT * FROM ExampleTable");
   PQclear(res);
 }
 
-void TestWithPool() {
-  ConnectionPool pool;
-  InitPool(&pool, CONNINFO);
-
+void TestWithPool(ConnectionPool pool) {
   double start = NowSeconds();
   for (int i = 0; i < N_QUERIES; i++) {
     PGconn *conn = BorrowConnection(&pool);
@@ -31,9 +29,7 @@ void TestWithPool() {
     ReleaseConnection(&pool, conn);
   }
   double end = NowSeconds();
-  ClosePool(&pool);
-
-  printf("Using pool: %.4f seconds for %d queries\n", end - start, N_QUERIES);
+  // printf("Using pool: %.4f seconds for %d queries\n", end - start, N_QUERIES);
 }
 
 void TestWithoutPool() {
@@ -54,8 +50,25 @@ void TestWithoutPool() {
 }
 
 int main() {
-  TestWithPool();
-  TestWithoutPool();
+  ConnectionPool pool;
+  InitPool(&pool, CONNINFO);
+
+  double total = 0.0;
+  int n_loops = 10;
+  for (int i = 0; i < n_loops; i++)
+  {
+    double start = NowSeconds();
+    TestWithPool(pool);  // Will print each run if you leave the print inside TestWithPool
+    double end = NowSeconds();
+    total += (end - start);
+  }
+
+  printf("Average time over %d runs: %.4f ms\n", n_loops, (total / (n_loops * N_QUERIES) * 1000));
+
+  ClosePool(&pool);
+
+  // Added in case we are curious about why pool is needed
+  // TestWithoutPool();
   return 0;
 }
 

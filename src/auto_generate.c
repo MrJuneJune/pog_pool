@@ -494,7 +494,7 @@ void ParseConfig(const char *config_path, PogPoolConfig *config)
 
 void GenerateModelFilesFromConfig()
 {
-  const char *config_path = "pog_pool_config.yml";
+  const char *config_path = "example/pog_pool_config.yml";
   PogPoolConfig pogPoolConfig = {0};
 
   ParseConfig(config_path, &pogPoolConfig);
