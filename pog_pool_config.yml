@@ -1,0 +1,3 @@
+input_model_folder: ./models
+output_model_folder: ./models
+database_url: db_urls

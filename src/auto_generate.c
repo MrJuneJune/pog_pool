@@ -1,4 +1,6 @@
 #include "pog_pool/auto_generate.h"
+#include "pog_pool/crud_header_template.h"
+#include "pog_pool/crud_src_template.h"
 
 
 const char* SqlToCType(const char *sql_type)
@@ -55,315 +57,321 @@ int GetWord(char *line, char *word)
   return res;
 }
 
+size_t GetFileSize(FILE *file)
+{
+  fseek(file, 0, SEEK_END);
+  size_t file_size = ftell(file);
+  rewind(file);
+  return file_size;
+}
+
+char* ReadTemplate(const char *file_path)
+{
+  FILE *file = fopen(file_path, "r");
+  if (!file)
+  {
+    fprintf(stderr, "Error opening file: %s\n", file_path);
+    return NULL;
+  }
+
+  size_t file_size = GetFileSize(file);
+  char *buffer = malloc(file_size*3 + 1);
+  if (!buffer)
+  {
+    fprintf(stderr, "Memory allocation failed\n");
+    fclose(file);
+    return NULL;
+  }
+
+  fread(buffer, 1, file_size, file);
+  buffer[file_size] = '\0';
+  fclose(file);
+  return buffer;
+}
+
+char* ReplaceAllChar(const char* buffer, const char* placeholder, const char* value)
+{
+  size_t buffer_len = strlen(buffer);
+  size_t placeholder_len = strlen(placeholder);
+  size_t value_len = strlen(value);
+
+  size_t count = 0;
+  const char* tmp = buffer;
+
+  // Count occurrences
+  while ((tmp = strstr(tmp, placeholder)))
+  {
+    count++;
+    tmp += placeholder_len;
+  }
+
+  // Compute new size
+  size_t new_size = buffer_len + count * (value_len - placeholder_len) + 1;
+  char* result = malloc(new_size);
+  if (!result) return NULL;
+
+  const char* src = buffer;
+  char* dst = result;
+  while ((tmp = strstr(src, placeholder)))
+  {
+    size_t chunk_len = tmp - src;
+    memcpy(dst, src, chunk_len);
+    dst += chunk_len;
+    memcpy(dst, value, value_len);
+    dst += value_len;
+    src = tmp + placeholder_len;
+  }
+  strcpy(dst, src); // copy remaining tail
+
+  return result; // caller must free
+}
+
+
+void ReplaceAll(char **buffer, const char *placeholder, const char *value)
+{
+  char *new_str = ReplaceAllChar(*buffer, placeholder, value);
+  free(*buffer);
+  *buffer = new_str;
+}
+
+char* GetDefaultValue(const char *c_type)
+{
+  if 
+  (
+    strcmp(c_type, "int") == 0 || 
+    strcmp(c_type, "short") == 0 || 
+    strcmp(c_type, "long long") == 0 || 
+    strcmp(c_type, "float") == 0 || 
+    strcmp(c_type, "double") == 0
+  )
+    return "0";
+  return "\"null\"";
+}
+
+void BuildAllCodegenPieces(const Column* columns, size_t count, const char* table_name, CodegenOutput* out)
+{
+  strcpy(out->column_names, "(");
+  out->format_parts[0] = '\0';
+  out->value_args[0] = '\0';
+  out->set_clause[0] = '\0';
+  out->update_args[0] = '\0';
+  out->field_assignments[0] = '\0';
+  strcpy(out->serialize_format, "{");
+  out->serialize_args[0] = '\0';
+
+  int first_val = 1;
+  int first_col = 1;
+  int first_update = 1;
+  int first_json = 1;
+
+  for (size_t i = 0; i < count; i++) {
+    const char* name = columns[i].name;
+    const char* sql_type = columns[i].type;
+    const char* c_type = SqlToCType(sql_type);
+
+    // Skip SERIAL columns
+    if (strcmp(sql_type, "SERIAL") == 0)
+      continue;
+
+    // --- column_names ---
+    if (!first_col) strcat(out->column_names, ", ");
+    strcat(out->column_names, name);
+
+    // --- format_parts ---
+    if (!first_col) strcat(out->format_parts, ", ");
+    if (strcmp(c_type, "short") == 0 || strcmp(c_type, "int") == 0)
+      strcat(out->format_parts, "%d");
+    else if (strcmp(c_type, "long long") == 0)
+      strcat(out->format_parts, "%lld");
+    else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0)
+      strcat(out->format_parts, "%f");
+    else if (strcmp(c_type, "bool") == 0)
+      strcat(out->format_parts, "%s");
+    else
+      strcat(out->format_parts, "'%s'");
+
+    // --- value_args ---
+    if (!first_val) strcat(out->value_args, ", ");
+    if (strcmp(c_type, "bool") == 0)
+      sprintf(out->value_args + strlen(out->value_args), "u.%s ? \"TRUE\" : \"FALSE\"", name);
+    else if (strcmp(c_type, "void*") == 0)
+      sprintf(out->value_args + strlen(out->value_args), "(char*)u.%s", name);
+    else
+      sprintf(out->value_args + strlen(out->value_args), "u.%s", name);
+
+    // --- set_clause ---
+    if (!first_update) strcat(out->set_clause, ", ");
+    if (strcmp(c_type, "long long") == 0)
+      sprintf(out->set_clause + strlen(out->set_clause), "%s=%%lld", name);
+    else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0)
+      sprintf(out->set_clause + strlen(out->set_clause), "%s=%%f", name);
+    else if (strcmp(c_type, "bool") == 0)
+      sprintf(out->set_clause + strlen(out->set_clause), "%s=%%s", name);
+    else
+      sprintf(out->set_clause + strlen(out->set_clause), "%s='%%s'", name);
+
+    // --- update_args ---
+    if (out->update_args[0] != '\0') strcat(out->update_args, ", ");
+    if (strcmp(c_type, "bool") == 0)
+      sprintf(out->update_args + strlen(out->update_args), "u.%s ? \"TRUE\" : \"FALSE\"", name);
+    else if (strcmp(c_type, "void*") == 0)
+      sprintf(out->update_args + strlen(out->update_args), "(char*)u.%s", name);
+    else
+      sprintf(out->update_args + strlen(out->update_args), "u.%s", name);
+
+    // --- field_assignments ---
+    char line[512];
+    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0 || strcmp(c_type, "long long") == 0) {
+      snprintf(line, sizeof(line),
+        "    if (strcmp(colname, \"%s\") == 0) list[i].%s = atoi(value);\n",
+        name, name);
+    } else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0) {
+      snprintf(line, sizeof(line),
+        "    if (strcmp(colname, \"%s\") == 0) list[i].%s = atof(value);\n",
+        name, name);
+    } else if (strcmp(c_type, "bool") == 0) {
+      snprintf(line, sizeof(line),
+        "    if (strcmp(colname, \"%s\") == 0) list[i].%s = (strcmp(value, \"t\") == 0);\n",
+        name, name);
+    } else {
+      snprintf(line, sizeof(line),
+        "    if (strcmp(colname, \"%s\") == 0) list[i].%s = strdup(value);\n",
+        name, name);
+    }
+    strcat(out->field_assignments, line);
+
+    // --- serialize_format ---
+    if (!first_json) strcat(out->serialize_format, ", ");
+    sprintf(out->serialize_format + strlen(out->serialize_format), "\\\"%s\\\":", name);
+    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0)
+      strcat(out->serialize_format, "%d");
+    else if (strcmp(c_type, "long long") == 0)
+      strcat(out->serialize_format, "%lld");
+    else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0)
+      strcat(out->serialize_format, "%f");
+    else if (strcmp(c_type, "bool") == 0 || strncmp(sql_type, "JSON", 4) == 0 || strncmp(sql_type, "JSONB", 5) == 0)
+      strcat(out->serialize_format, "%s");
+    else if (strstr(sql_type, "[]") != NULL)
+      strcat(out->serialize_format, "%s");
+    else
+      strcat(out->serialize_format, "\\\"%s\\\"");
+
+    // --- serialize_args ---    
+    if (out->serialize_args[0] != '\0') strcat(out->serialize_args, ",\n    ");
+    if (strcmp(c_type, "bool") == 0)
+    {
+      sprintf(out->serialize_args + strlen(out->serialize_args), "u.%s ? \"true\" : \"false\"", name);
+    }
+    else if (strstr(sql_type, "[]") != NULL)
+    {
+      sprintf(out->serialize_args + strlen(out->serialize_args),
+        "(u.%s ? ({ const char *src = u.%s; size_t len = strlen(src); char *tmp = malloc(len + 3); if (!tmp) tmp = \"[]\"; else { tmp[0] = '['; strncpy(tmp + 1, src + 1, len - 2); tmp[len - 1] = ']'; tmp[len] = '\\0'; } tmp; }) : \"null\")",
+        name,
+        name
+      );
+    }
+    else if (strcmp(c_type, "void*") == 0 || strncmp(sql_type, "JSON", 4) == 0 || strncmp(sql_type, "JSONB", 5) == 0)
+    {
+      sprintf(out->serialize_args + strlen(out->serialize_args), "(u.%s ? (char*)u.%s : \"null\")", 
+        name,
+        name
+      );
+    } 
+    else
+    {
+      sprintf(out->serialize_args + strlen(out->serialize_args), "(u.%s ? u.%s : %s)", name, name, GetDefaultValue(c_type));
+    }
+
+    first_col = 0;
+    first_val = 0;
+    first_update = 0;
+    first_json = 0;
+  }
+
+  strcat(out->serialize_format, "}");
+  strcat(out->column_names, ")");
+}
+
+void CreateHeader(
+  FILE* file_out_p,
+  const char* table_name,
+  const Column *columns,
+  const size_t column_sizes
+)
+{
+  char struct_fields[2048] = {0};
+  for (size_t i = 0; i < column_sizes; i++) {
+    const char* c_type = SqlToCType(columns[i].type);
+    char line[128];
+    snprintf(line, sizeof(line), "  %s %s;\n", c_type, columns[i].name);
+    strcat(struct_fields, line);
+  }
+
+  char *template = strdup(CRUD_HEADER_TEMPLATE);
+  ReplaceAll(&template, "{{TABLE_NAME}}", table_name);
+  ReplaceAll(&template, "{{STRUCT_FIELDS}}", struct_fields);
+  fprintf(file_out_p, "%s", template);
+  fclose(file_out_p);
+}
+
+void CreateSrc(
+  FILE* file_out_p,
+  const char* table_name,
+  const Column *columns,
+  const size_t column_sizes
+)
+{
+  CodegenOutput code = {0};
+  BuildAllCodegenPieces(columns, column_sizes, table_name, &code);
+
+  // Load and replace template
+  char *template = strdup(CRUD_SRC_TEMPLATE);
+
+  ReplaceAll(&template, "{{TABLE_NAME}}", table_name);
+  ReplaceAll(&template, "{{STRUCT_NAME}}", table_name);
+  ReplaceAll(&template, "{{QUERY_BUFFER}}", "4096");
+  ReplaceAll(&template, "{{SERIALIZE_BUFFER}}", "4096");
+
+  ReplaceAll(&template, "{{COLUMN_NAMES}}", code.column_names);
+  ReplaceAll(&template, "{{FORMAT_PARTS}}", code.format_parts);
+  ReplaceAll(&template, "{{VALUE_ARGS}}", code.value_args);
+  ReplaceAll(&template, "{{SET_CLAUSE}}", code.set_clause);
+  ReplaceAll(&template, "{{UPDATE_ARGS}}", code.update_args);
+  ReplaceAll(&template, "{{FIELD_ASSIGNMENTS}}", code.field_assignments);
+  ReplaceAll(&template, "{{SERIALIZE_JSON_FORMAT}}", code.serialize_format);
+  ReplaceAll(&template, "{{SERIALIZE_JSON_ARGS}}", code.serialize_args);
+
+  fprintf(file_out_p, "%s", template);
+  fclose(file_out_p);
+}
+
 void CreateCRUDFiles(
   const char *table_name,
   const Column *columns,
   size_t column_sizes,
   const char *output_folder
-)
-{
-  // TODO: Make this dynamic by counting length of the file?
-  char file_name[1024];
+) {
+  char header_file_name[1024];
+  char src_file_name[1024];
+  FILE *src_file_out_p;
+  FILE *header_file_out_p;
 
-  // Create header file
-  snprintf(file_name, sizeof(file_name), "%s/model_%s.h", output_folder, table_name);
-  printf("%s\n", file_name);
-  FILE *file_out_p = fopen(file_name, "w");
-  if (!file_out_p)
+  snprintf(header_file_name, sizeof(header_file_name), "%s/model_%s.h", output_folder, table_name);
+  header_file_out_p = fopen(header_file_name, "w");
+  if (!header_file_out_p)
   {
-    perror("fopen");
+    perror("fopen header");
     return;
   }
+  CreateHeader(header_file_out_p, table_name, columns, column_sizes);
 
-  fprintf(file_out_p, "#ifndef MODEL_%s\n", table_name);
-  fprintf(file_out_p, "#define MODEL_%s\n\n", table_name);
-  fprintf(file_out_p, "#include <postgresql/libpq-fe.h>\n#include <stdbool.h>\n\n");
-  fprintf(file_out_p, "typedef struct {\n");
-  for (size_t i = 0; i < column_sizes; i++)
-  {
-    const char *c_type = SqlToCType(columns[i].type);
-    fprintf(file_out_p, "  %s %s;\n", c_type, columns[i].name);
-  }
-  fprintf(file_out_p, "} %s;\n\n",table_name);
-
-  fprintf(file_out_p, "typedef struct {\n");
-  fprintf(file_out_p, "  %s* %s;\n", table_name, table_name);
-  fprintf(file_out_p, "  ExecStatusType status;\n");
-  fprintf(file_out_p, "} %sQuery;\n\n", table_name);
-
-  fprintf(file_out_p, "%sQuery Query%s(PGconn *conn, const char *where_clause);\n", table_name, table_name);
-  fprintf(file_out_p, "void Insert%s(PGconn *conn, %s u);\n", table_name, table_name);
-  fprintf(file_out_p, "void Update%s(PGconn *conn, %s u, const char *where_clause);\n", table_name, table_name);
-  fprintf(file_out_p, "void Delete%s(PGconn *conn, const char *where_clause);\n\n", table_name);
-  fprintf(file_out_p, "char* Serialize%s(%s u);\n", table_name, table_name);
-  fprintf(file_out_p, "#endif // MODEL_%s\n", table_name);
-  fclose(file_out_p);
-
-  // Create source file 
-  snprintf(file_name, sizeof(file_name), "%s/model_%s.c", output_folder, table_name);
-  file_out_p = fopen(file_name, "w");
-  if (!file_out_p)
-  {
-    perror("fopen");
+  snprintf(src_file_name, sizeof(src_file_name), "%s/model_%s.c", output_folder, table_name);
+  src_file_out_p = fopen(src_file_name, "w");
+  if (!src_file_out_p) {
+    perror("fopen source");
     return;
   }
-
-  // Build column list and format string
-  char column_names[512] = {0};
-  char format_parts[512] = {0};
-  char value_args[512] = {0};
-
-  strcat(column_names, "(");
-  for (size_t i = 0; i < column_sizes; i++)
-  {
-    const char *name = columns[i].name;
-    const char *c_type = SqlToCType(columns[i].type);
-  
-    // Skip SERIAL (Postgres will auto-generate)
-    if (strcmp(columns[i].type, "SERIAL") == 0)
-      continue;
-  
-    strcat(column_names, name);
-  
-    // Format string
-    if (strcmp(c_type, "short") == 0 || strcmp(c_type, "int") == 0)
-    {
-      strcat(format_parts, "%d");
-    }
-    else if (strcmp(c_type, "long long") == 0)
-    {
-      strcat(format_parts, "%lld");
-    }
-    else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0)
-    {
-      strcat(format_parts, "%f");
-    }
-    else if (strcmp(c_type, "bool") == 0)
-    {
-      strcat(format_parts, "%s");
-    }
-    else
-    {
-      strcat(format_parts, "'%s'");
-    }
-  
-    // Add value argument
-    char tmp[64];
-    if (strcmp(c_type, "void*") == 0)
-    {
-      snprintf(tmp, sizeof(tmp), "(char*)u.%s", name);
-    }
-    else if (strcmp(c_type, "bool") == 0)
-    {
-      snprintf(tmp, sizeof(tmp), "u.%s ? \"TRUE\" : \"FALSE\"", name);
-    }
-    else
-    {
-      snprintf(tmp, sizeof(tmp), "u.%s", name);
-    }
-  
-    strcat(value_args, tmp);
-  
-    // Trailing commas if not last
-    if (i != column_sizes - 1)
-    {
-      strcat(column_names, ", ");
-      strcat(format_parts, ", ");
-      strcat(value_args, ", ");
-    }
-  }
-  strcat(column_names, ")");
-
-  // Build SET clause and format string
-  char set_clause[1024] = {0};
-  char update_args[1024] = {0};
-  
-  for (size_t i = 0, written = 0; i < column_sizes; i++)
-  {
-    const char *name = columns[i].name;
-    const char *c_type = SqlToCType(columns[i].type);
-  
-    // skip auto-generated
-    if (strncmp(columns[i].type, "SERIAL", 6) == 0) continue;
-  
-    // --- SET clause formatting ---
-    char set_line[64];
-    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0) {
-      snprintf(set_line, sizeof(set_line), "%s=%%d", name);
-    } else if (strcmp(c_type, "long long") == 0) {
-      snprintf(set_line, sizeof(set_line), "%s=%%lld", name);
-    } else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0) {
-      snprintf(set_line, sizeof(set_line), "%s=%%f", name);
-    } else if (strcmp(c_type, "bool") == 0) {
-      snprintf(set_line, sizeof(set_line), "%s=%%s", name);  // will pass "TRUE"/"FALSE"
-    } else {
-      snprintf(set_line, sizeof(set_line), "%s='%%s'", name);
-    }
-  
-    // --- Value argument formatting ---
-    char arg_line[64];
-    if (strcmp(c_type, "bool") == 0) {
-      snprintf(arg_line, sizeof(arg_line), "u.%s ? \"TRUE\" : \"FALSE\"", name);
-    } else if (strcmp(c_type, "void*") == 0) {
-      snprintf(arg_line, sizeof(arg_line), "(char*)u.%s", name);
-    } else {
-      snprintf(arg_line, sizeof(arg_line), "u.%s", name);
-    }
-  
-    // --- Append to buffer ---
-    if (written > 0) {
-      strcat(set_clause, ", ");
-      strcat(update_args, ", ");
-    }
-  
-    strcat(set_clause, set_line);
-    strcat(update_args, arg_line);
-    written++;
-  }
-
-  fprintf(file_out_p, "#include \"model_%s.h\"\n", table_name);
-  fprintf(file_out_p, "#include <stdlib.h>\n#include <stdio.h>\n#include <string.h>\n\n");
-
-  // QUERY function
-  fprintf(file_out_p, "%sQuery Query%s(PGconn *conn, const char *where_clause)\n{\n", table_name, table_name);
-  fprintf(file_out_p, "  %sQuery query_result;\n", table_name);
-  fprintf(file_out_p, "  char query[%i];\n", QUERY_BUFFER);
-  fprintf(file_out_p, "  snprintf(query, sizeof(query), \"SELECT * FROM %s WHERE %%s;\", where_clause);\n", table_name);
-  fprintf(file_out_p, "  PGresult *res = PQexec(conn, query);\n");
-  fprintf(file_out_p, "  ExecStatusType status = PQresultStatus(res);");
-  fprintf(file_out_p, "  query_result.%s = NULL;\n", table_name);
-  fprintf(file_out_p, "  query_result.status = status;");
-  fprintf(file_out_p, "  if (status != PGRES_TUPLES_OK)\n  {\n");
-  fprintf(file_out_p, "    fprintf(stderr, \"SELECT failed: %%s\\n\", PQerrorMessage(conn));\n");
-  fprintf(file_out_p, "    PQclear(res);\n");
-  fprintf(file_out_p, "    return query_result;\n");
-  fprintf(file_out_p, "  }\n");
-  
-  fprintf(file_out_p, "  int rows = PQntuples(res);\n");
-
-  fprintf(file_out_p, "   if (rows == 0)\n");
-  fprintf(file_out_p, "   {\n");
-  fprintf(file_out_p, "     return query_result;\n");
-  fprintf(file_out_p, "   }\n");
-  fprintf(file_out_p, "  %s* list = malloc(rows * sizeof(%s));\n", table_name, table_name);
-  fprintf(file_out_p, "  for (int i = 0; i < rows; ++i)\n  {\n");
-  
-  for (size_t i = 0; i < column_sizes; i++) {
-    const char *name = columns[i].name;
-    const char *c_type = SqlToCType(columns[i].type);
-  
-    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0 || strcmp(c_type, "long long") == 0)
-    {
-      fprintf(file_out_p, "    list[i].%s = atoi(PQgetvalue(res, i, %zu));\n", name, i);
-    } 
-    else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0)
-    {
-      fprintf(file_out_p, "    list[i].%s = atof(PQgetvalue(res, i, %zu));\n", name, i);
-    }
-    else
-    {
-      fprintf(file_out_p, "    list[i].%s = strdup(PQgetvalue(res, i, %zu));\n", name, i);
-    }
-  }
-  
-  fprintf(file_out_p, "  }\n");
-  fprintf(file_out_p, "  PQclear(res);\n");
-  fprintf(file_out_p, "  query_result.%s = list;", table_name);
-  fprintf(file_out_p, "  return query_result;");
-  fprintf(file_out_p, "}\n\n");
-
-  // INSERT function
-  fprintf(file_out_p, "void Insert%s(PGconn *conn, %s u)\n{\n", table_name, table_name);
-  fprintf(file_out_p, "  char query[%i];\n", QUERY_BUFFER);
-  fprintf(file_out_p, "  snprintf(query, sizeof(query),\n");
-  fprintf(file_out_p, "    \"INSERT INTO %s %s \"\n    \"VALUES (%s);\",\n", table_name, column_names, format_parts);
-  fprintf(file_out_p, "    %s);\n", value_args);
-  fprintf(file_out_p, "  PGresult *res = PQexec(conn, query);\n");
-  fprintf(file_out_p, "  if (PQresultStatus(res) != PGRES_COMMAND_OK) {\n");
-  fprintf(file_out_p, "    fprintf(stderr, \"Insert failed: %%s\\n\", PQerrorMessage(conn));\n");
-  fprintf(file_out_p, "  }\n");
-  fprintf(file_out_p, "  PQclear(res);\n");
-  fprintf(file_out_p, "}\n\n");
-
-  // UPDATE function
-  fprintf(file_out_p, "void Update%s(PGconn *conn, %s u, const char *where_clause)\n{\n", table_name, table_name);
-  fprintf(file_out_p, "  char query[%i];\n", QUERY_BUFFER);
-  fprintf(file_out_p, "  snprintf(query, sizeof(query),\n");
-  fprintf(file_out_p, "    \"UPDATE %s SET %s WHERE %%s;\",\n", table_name, set_clause);
-  fprintf(file_out_p, "    %s, where_clause);\n", update_args);
-  fprintf(file_out_p, "  PGresult *res = PQexec(conn, query);\n");
-  fprintf(file_out_p, "  if (PQresultStatus(res) != PGRES_COMMAND_OK) {\n");
-  fprintf(file_out_p, "    fprintf(stderr, \"Update failed: %%s\\n\", PQerrorMessage(conn));\n");
-  fprintf(file_out_p, "  }\n");
-  fprintf(file_out_p, "  PQclear(res);\n");
-  fprintf(file_out_p, "}\n\n");
-
-  // DELETE stub
-  fprintf(file_out_p, "void Delete%s(PGconn *conn, const char *where_clause)\n{\n", table_name);
-  fprintf(file_out_p, "  char query[%i];\n", QUERY_BUFFER);
-  fprintf(file_out_p, "  snprintf(query, sizeof(query),\n");
-  fprintf(file_out_p, "    \"DELETE FROM %s WHERE %%s;\",\n", table_name);
-  fprintf(file_out_p, "    where_clause);\n");
-  fprintf(file_out_p, "  PGresult *res = PQexec(conn, query);\n");
-  fprintf(file_out_p, "  if (PQresultStatus(res) != PGRES_COMMAND_OK) {\n");
-  fprintf(file_out_p, "    fprintf(stderr, \"Delete failed: %%s\\n\", PQerrorMessage(conn));\n");
-  fprintf(file_out_p, "  }\n");
-  fprintf(file_out_p, "  PQclear(res);\n");
-  fprintf(file_out_p, "}\n\n");
-
-  // Serialize stub
-  fprintf(file_out_p, "char* Serialize%s(%s u)\n{\n", table_name, table_name);
-  fprintf(file_out_p, "  char *buffer = malloc(%d);\n", QUERY_BUFFER * 2);
-  fprintf(file_out_p, "  if (!buffer) return NULL;\n");
-  fprintf(file_out_p, "  snprintf(buffer, %d,\n", QUERY_BUFFER * 2);
-  fprintf(file_out_p, "    \"{");
-  for (size_t i = 0; i < column_sizes; i++) {
-    const char *name = columns[i].name;
-    const char *c_type = SqlToCType(columns[i].type);
-    const char *sql_type = columns[i].type;
-  
-    // JSON key
-    fprintf(file_out_p, "\\\"%s\\\":", name);
-  
-    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0) {
-      fprintf(file_out_p, "%%d");
-    } else if (strcmp(c_type, "long long") == 0) {
-      fprintf(file_out_p, "%%lld");
-    } else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0) {
-      fprintf(file_out_p, "%%f");
-    } else if (strcmp(c_type, "bool") == 0) {
-      fprintf(file_out_p, "%%s"); // will insert "true" or "false"
-    } else if (strncmp(sql_type, "JSON", 4) == 0 || strncmp(sql_type, "JSONB", 5) == 0) {
-      fprintf(file_out_p, "%%s"); // inline raw json
-    } else if (strstr(sql_type, "[]") != NULL) {
-      fprintf(file_out_p, "%%s"); // formatted as a JSON array
-    } else {
-      fprintf(file_out_p, "\\\"%%s\\\""); // wrap plain strings
-    }
-  
-    if (i != column_sizes - 1) fprintf(file_out_p, ", ");
-  }
-  fprintf(file_out_p, "}\",\n");
-  for (size_t i = 0; i < column_sizes; i++) {
-    const char *name = columns[i].name;
-    const char *c_type = SqlToCType(columns[i].type);
-    const char *sql_type = columns[i].type;
-  
-    if (strcmp(c_type, "bool") == 0) {
-      fprintf(file_out_p, "    u.%s ? \"true\" : \"false\"", name);
-    } else if (strstr(sql_type, "[]") != NULL) {
-      // inline conversion: {1,2,3} -> [1,2,3]
-      fprintf(file_out_p, "    ({ const char *src = u.%s; size_t len = strlen(src); char *tmp = malloc(len + 3); if (!tmp) tmp = \"[]\"; else { tmp[0] = '['; strncpy(tmp + 1, src + 1, len - 2); tmp[len - 1] = ']'; tmp[len] = '\\0'; } tmp; })", name);
-    } else if (strcmp(c_type, "void*") == 0 || strncmp(sql_type, "JSON", 4) == 0 || strncmp(sql_type, "JSONB", 5) == 0) {
-      fprintf(file_out_p, "    (char*)u.%s", name);
-    } else {
-      fprintf(file_out_p, "    u.%s", name);
-    }
-  
-    if (i != column_sizes - 1) fprintf(file_out_p, ",\n");
-  }
-  fprintf(file_out_p, "  );\n  return buffer;\n}\n");
-  fclose(file_out_p);
+  CreateSrc(src_file_out_p, table_name, columns, column_sizes);
 } 
 
 void CreateCRUDFilesFromSQL(
@@ -450,6 +458,7 @@ void EnsureDefaultConfig(const char *config_path)
   }
   fprintf(file, "input_model_folder: ./models\n");
   fprintf(file, "output_model_folder: ./models\n");
+  fprintf(file, "database_url: db_urls\n");
   fclose(file);
 }
 

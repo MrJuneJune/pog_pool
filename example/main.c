@@ -6,7 +6,8 @@ volatile ConnectionPool* connection_pool;
 
 int main()
 {
-  const char *config_path = "pog_pool_config.yml";
+  // assumping you are running make from make folder
+  const char *config_path = "./example/pog_pool_config.yml";
   PogPoolConfig pogPoolConfig = {0};
 
   ParseConfig(config_path, &pogPoolConfig);
@@ -52,11 +53,14 @@ int main()
   };
   
   InsertExampleTable(pg_conn, example);
-  
-  ExampleTableQuery et = QueryExampleTable(pg_conn, "1=1");
+
+  ExampleTableQuery et;
+  ExampleTable* e;
+
+  et = QueryExampleTable(pg_conn, "*", "1=1");
   if (et.ExampleTable != NULL)
   {
-    ExampleTable* e = et.ExampleTable;
+    e = et.ExampleTable;
   
     printf("id: %s\n", e->id);
     printf("small_int_col: %d\n", e->small_int_col);
@@ -96,6 +100,49 @@ int main()
   {
     printf("Does not exist...\n");
   }
+
+  // ID only
+  printf("ID ONLY\n\n\n");
+  et = QueryExampleTable(pg_conn, "id", "1=1");
+  if (et.ExampleTable != NULL)
+  {
+    e = et.ExampleTable;
+  
+    printf("id: %s\n", e->id);
+    printf("small_int_col: %d\n", e->small_int_col);
+    printf("int_col: %d\n", e->int_col);
+    printf("big_int_col: %lld\n", e->big_int_col);
+    printf("decimal_col: %.2f\n", e->decimal_col);
+    printf("numeric_col: %.3f\n", e->numeric_col);
+    printf("real_col: %i\n", e->real_col);  // stored as string
+    printf("double_col: %f\n", e->double_col);
+    // serial_col is auto-generated — skip or print if needed
+    // printf("serial_col: %s\n", (char*)e->serial_col);
+  
+    printf("char_col: %s\n", e->char_col);
+    printf("varchar_col: %s\n", e->varchar_col);
+    printf("text_col: %s\n", e->text_col);
+  
+    printf("date_col: %s\n", e->date_col);
+    printf("time_col: %s\n", e->time_col);
+    printf("timestamp_col: %s\n", e->timestamp_col);
+    printf("timestamptz_col: %s\n", e->timestamptz_col);
+  
+    printf("boolean_col: %s\n", e->boolean_col ? "TRUE" : "FALSE");
+    printf("another_uuid: %s\n", e->another_uuid);
+  
+    printf("json_col: %s\n", (char*)e->json_col);
+    printf("jsonb_col: %s\n", (char*)e->jsonb_col);
+  
+    printf("int_array_col: %s\n", e->int_array_col);
+    printf("text_array_col: %s\n", e->text_array_col);
+  
+    printf("status_col: %s\n", (char*)e->status_col);
+    printf("file_col (hex): %s\n", (char*)e->file_col);
+
+    printf("\n\nSerialized: %s\n", SerializeExampleTable(*et.ExampleTable));
+  }
+
   char where_clause[512];
   sprintf(where_clause, "id = \'%s\'", example.id);
   DeleteExampleTable(pg_conn, where_clause);

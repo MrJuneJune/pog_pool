@@ -16,13 +16,13 @@
 #define COLUNM_LEN 64 
 #define MAX_COLUNM_NUM 64 
 #define QUERY_BUFFER 1024
+#define DIR_LEN 512
+#define FILE_LEN 256
+#define DATABASE_URL_LEN 512
 
 // This should be removed when we handle other keys
 #define CREATE_TABLE 13
 #define IS_CREATE_TABLE(str) (strncmp(str, "CREATE TABLE", 12) == 0)
-#define DIR_LEN 512
-#define FILE_LEN 256
-#define DATABASE_URL_LEN 512
 
 
 typedef struct {
@@ -36,6 +36,17 @@ typedef struct {
   char output_file[FILE_LEN];
   char database_url[DATABASE_URL_LEN];
 } PogPoolConfig;
+
+typedef struct {
+  char column_names[512];
+  char format_parts[512];
+  char value_args[1024];
+  char set_clause[1024];
+  char update_args[1024];
+  char field_assignments[4096];
+  char serialize_format[2048];
+  char serialize_args[2048];
+} CodegenOutput;
 
 // TODO: Split these up?
 // Helper functions 

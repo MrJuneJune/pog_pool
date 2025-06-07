@@ -5,6 +5,7 @@ TEST_DIR = test
 INCLUDE_DIR = include/pog_pool
 SRC_DIR = src
 BUILD_DIR = build
+TEMPLATE_DIR = templates
 
 all: debug
 
@@ -36,14 +37,22 @@ auto_generate: pog_pool | $(BIN_DIR)
 	$(CC) example/generate_models.c $(CFLAGS) -Lbuild -lpog_pool -o $(BIN_DIR)/auto_generate
 	$(BIN_DIR)/auto_generate
 
-pog_pool: connection.o auto_generate.o
+pog_pool: connection.o auto_generate.o 
 	ar rcs $(BUILD_DIR)/libpog_pool.a $(BUILD_DIR)/*.o
 
-auto_generate.o: $(SRC_DIR)/auto_generate.c $(INCLUDE_DIR)/auto_generate.h | $(BUILD_DIR)
+auto_generate.o: $(SRC_DIR)/auto_generate.c $(INCLUDE_DIR)/auto_generate.h template_to_header | $(BUILD_DIR)
 	$(CC) -c $(SRC_DIR)/auto_generate.c -o $(BUILD_DIR)/auto_generate.o $(CFLAGS)
 
 connection.o: $(SRC_DIR)/connection.c $(INCLUDE_DIR)/connection.h | $(BUILD_DIR)
 	$(CC) -c $(SRC_DIR)/connection.c -o $(BUILD_DIR)/connection.o $(CFLAGS)
+
+template_to_header: $(SRC_DIR)/$(TEMPLATE_DIR)/crud_header.pog_templ $(SRC_DIR)/$(TEMPLATE_DIR)/crud.pog_templ
+	echo 'char* CRUD_HEADER_TEMPLATE =' > $(INCLUDE_DIR)/crud_header_template.h
+	sed 's/\\/\\\\/g; s/"/\\"/g; s/^/"/; s/$$/\\n"/' $(SRC_DIR)/$(TEMPLATE_DIR)/crud_header.pog_templ >> $(INCLUDE_DIR)/crud_header_template.h
+	echo ';' >> $(INCLUDE_DIR)/crud_header_template.h
+	echo 'char* CRUD_SRC_TEMPLATE =' > $(INCLUDE_DIR)/crud_src_template.h
+	sed 's/\\/\\\\/g; s/"/\\"/g; s/^/"/; s/$$/\\n"/' $(SRC_DIR)/$(TEMPLATE_DIR)/crud.pog_templ >> $(INCLUDE_DIR)/crud_src_template.h
+	echo ';' >> $(INCLUDE_DIR)/crud_src_template.h
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)

@@ -1,0 +1,21 @@
+#ifndef MODEL_{{TABLE_NAME}}
+#define MODEL_{{TABLE_NAME}}
+
+#include <postgresql/libpq-fe.h>
+#include <stdbool.h>
+
+typedef struct {
+{{STRUCT_FIELDS}}} {{TABLE_NAME}};
+
+typedef struct {
+  {{TABLE_NAME}}* {{TABLE_NAME}};
+  ExecStatusType status;
+} {{TABLE_NAME}}Query;
+
+{{TABLE_NAME}}Query Query{{TABLE_NAME}}(PGconn *conn, const char *select, const char *where_clause);
+void Insert{{TABLE_NAME}}(PGconn *conn, {{TABLE_NAME}} u);
+void Update{{TABLE_NAME}}(PGconn *conn, {{TABLE_NAME}} u, const char *where_clause);
+void Delete{{TABLE_NAME}}(PGconn *conn, const char *where_clause);
+char* Serialize{{TABLE_NAME}}({{TABLE_NAME}} u);
+
+#endif // MODEL_{{TABLE_NAME}}
