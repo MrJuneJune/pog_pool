@@ -20,7 +20,7 @@ int main()
   RunSQLFile(pg_conn, "models/ExampleTable.sql");
 
   ExampleTable example = {
-    .id = "b6d4c431-f327-4a4a-9345-320aa3cd7e51",
+    .id = "b6d4c431-f327-4a4a-9345-320aa3cd7e31",
     .small_int_col = 1,
     .int_col = 42,
     .big_int_col = 9000000000LL,
@@ -45,15 +45,21 @@ int main()
     .json_col = "{\"key\": \"value\"}",
     .jsonb_col = "{\"key\": \"value\"}",
   
-    .int_array_col = "{1,2,3}",
-    .text_array_col = "{\"apple\",\"banana\"}",
+    .int_array_col = (int[]){1,2,3},
+    .int_array_col_len = 3,
+    .text_array_col = (char* []){"apple","banana"},
+    .text_array_col_len = 2,
   
     .status_col = "active",
     .file_col = "\\x68656c6c6f" 
   };
 
   printf("\n\n\n---INSERT---\n\n\n");
-  InsertExampleTable(pg_conn, example);
+  if (InsertExampleTable(pg_conn, example) == 1)
+  {
+    printf("\n\n\nINSERT FAILED\n\n\n");
+    return 0;
+  }
 
   ExampleTableQuery et;
   ExampleTable* e;
@@ -90,8 +96,8 @@ int main()
     printf("json_col: %s\n", (char*)e->json_col);
     printf("jsonb_col: %s\n", (char*)e->jsonb_col);
   
-    printf("int_array_col: %s\n", e->int_array_col);
-    printf("text_array_col: %s\n", e->text_array_col);
+    printf("int_array_col[0]: %d\n", e->int_array_col[0]);
+    printf("text_array_col[0]: %s\n", e->text_array_col[0]);
   
     printf("status_col: %s\n", (char*)e->status_col);
     printf("file_col (hex): %s\n", (char*)e->file_col);

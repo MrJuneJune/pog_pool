@@ -3,6 +3,8 @@
 
 #include <postgresql/libpq-fe.h>
 #include <stdbool.h>
+#include <pog_pool/connection.h>
+#include <pog_pool/auto_generate.h>
 
 typedef struct {
 {{STRUCT_FIELDS}}} {{TABLE_NAME}};
@@ -13,9 +15,9 @@ typedef struct {
 } {{TABLE_NAME}}Query;
 
 {{TABLE_NAME}}Query Query{{TABLE_NAME}}(PGconn *conn, const char *select, const char *where_clause);
-void Insert{{TABLE_NAME}}(PGconn *conn, {{TABLE_NAME}} u);
-void Update{{TABLE_NAME}}(PGconn *conn, {{TABLE_NAME}} u, const char *where_clause);
-void Delete{{TABLE_NAME}}(PGconn *conn, const char *where_clause);
+int Insert{{TABLE_NAME}}(PGconn *conn, {{TABLE_NAME}} u);
+int Update{{TABLE_NAME}}(PGconn *conn, {{TABLE_NAME}} u, const char *where_clause);
+int Delete{{TABLE_NAME}}(PGconn *conn, const char *where_clause);
 char* Serialize{{TABLE_NAME}}({{TABLE_NAME}} u);
 
 #endif // MODEL_{{TABLE_NAME}}

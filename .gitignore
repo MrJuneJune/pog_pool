@@ -8,5 +8,4 @@ build/
 
 # release
 dist/
-
 venv/

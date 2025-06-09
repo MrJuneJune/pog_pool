@@ -8,6 +8,7 @@
   {{STRUCT_NAME}}Query query_result;
   char query[{{QUERY_BUFFER}}];
   snprintf(query, sizeof(query), "SELECT %s FROM {{TABLE_NAME}} WHERE %s;", select, where_clause);
+  printf("Query: %s\n", query);
   PGresult *res = PQexec(conn, query);
   ExecStatusType status = PQresultStatus(res);
   query_result.{{TABLE_NAME}} = NULL;
@@ -35,37 +36,42 @@
   return query_result;
 }
 
-void Insert{{STRUCT_NAME}}(PGconn *conn, {{STRUCT_NAME}} u)
+int Insert{{STRUCT_NAME}}(PGconn *conn, {{STRUCT_NAME}} u)
 {
-  char query[{{QUERY_BUFFER}}] = {0};
+  char query[10000] = {0};
   snprintf(query, sizeof(query),
     "INSERT INTO {{TABLE_NAME}} {{COLUMN_NAMES}} "
     "VALUES ({{FORMAT_PARTS}});",
     {{VALUE_ARGS}});
-  printf("%s\n", query);
+  printf("Query: %s\n", query);
   PGresult *res = PQexec(conn, query);
   if (PQresultStatus(res) != PGRES_COMMAND_OK)
   {
     fprintf(stderr, "Insert failed: %s\n", PQerrorMessage(conn));
+    return 1;
   }
   PQclear(res);
+  return 0;
 }
 
-void Update{{STRUCT_NAME}}(PGconn *conn, {{STRUCT_NAME}} u, const char *where_clause)
+int Update{{STRUCT_NAME}}(PGconn *conn, {{STRUCT_NAME}} u, const char *where_clause)
 {
   char query[10000] = {0};
   snprintf(query, sizeof(query),
     "UPDATE {{TABLE_NAME}} SET {{SET_CLAUSE}} WHERE %s;",
     {{UPDATE_ARGS}}, where_clause);
+  printf("Query: %s\n", query);
   PGresult *res = PQexec(conn, query);
   if (PQresultStatus(res) != PGRES_COMMAND_OK)
   {
     fprintf(stderr, "Update failed: %s\n", PQerrorMessage(conn));
+    return 1;
   }
   PQclear(res);
+  return 0;
 }
 
-void Delete{{STRUCT_NAME}}(PGconn *conn, const char *where_clause)
+int Delete{{STRUCT_NAME}}(PGconn *conn, const char *where_clause)
 {
   char query[{{QUERY_BUFFER}}];
   snprintf(query, sizeof(query),
@@ -75,8 +81,10 @@ void Delete{{STRUCT_NAME}}(PGconn *conn, const char *where_clause)
   if (PQresultStatus(res) != PGRES_COMMAND_OK)
   {
     fprintf(stderr, "Delete failed: %s\n", PQerrorMessage(conn));
+    return 1;
   }
   PQclear(res);
+  return 0;
 }
 
 char* Serialize{{STRUCT_NAME}}({{STRUCT_NAME}} u)

@@ -9,6 +9,10 @@ TEMPLATE_DIR = templates
 
 all: debug
 
+release: pog_pool 
+	cp -r include/* dist/include
+	cp $(BUILD_DIR)/libpog_pool.a dist 
+
 bench: pog_pool_benchmark python_benchmark
 
 pog_pool_benchmark: $(TEST_DIR)/benchmark_connection_pool.c $(BUILD_DIR)/connection.o | $(BIN_DIR)
@@ -34,8 +38,9 @@ example: example/main.c auto_generate pog_pool
 	$(CC) example/main.c $(shell find $(BUILD_DIR) -name 'model_*.c')  $(CFLAGS) -Lbuild -lpog_pool -o $(BIN_DIR)/main
 
 auto_generate: pog_pool | $(BIN_DIR)
-	$(CC) example/generate_models.c $(CFLAGS) -Lbuild -lpog_pool -o $(BIN_DIR)/auto_generate
-	$(BIN_DIR)/auto_generate
+	$(CC) example/generate_models.c $(CFLAGS) -Lbuild -lpog_pool -o $(BIN_DIR)/auto_generate && \
+	cd example && \
+	../$(BIN_DIR)/auto_generate
 
 pog_pool: connection.o auto_generate.o 
 	ar rcs $(BUILD_DIR)/libpog_pool.a $(BUILD_DIR)/*.o
@@ -53,6 +58,9 @@ template_to_header: $(SRC_DIR)/$(TEMPLATE_DIR)/crud_header.pog_templ $(SRC_DIR)/
 	echo 'char* CRUD_SRC_TEMPLATE =' > $(INCLUDE_DIR)/crud_src_template.h
 	sed 's/\\/\\\\/g; s/"/\\"/g; s/^/"/; s/$$/\\n"/' $(SRC_DIR)/$(TEMPLATE_DIR)/crud.pog_templ >> $(INCLUDE_DIR)/crud_src_template.h
 	echo ';' >> $(INCLUDE_DIR)/crud_src_template.h
+
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)

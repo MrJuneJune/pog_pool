@@ -3,11 +3,129 @@
 #include "pog_pool/crud_src_template.h"
 
 
+char* SanitizeHexForJSON(const char* input)
+{
+  if (!input) return "none";
+
+  if (strncmp(input, "\\x", 2) == 0) {
+    return strdup(input + 2);  
+  }
+
+  return strdup(input); 
+}
+
+char* ArrayToString_int(const int* arr, int len, int is_json)
+{
+  if (!arr || len <= 0) return strdup("{}");
+
+  size_t buf_size = len * 12 + 2;
+  char* out = malloc(buf_size);
+  if (!out) return NULL;
+
+  out[0] = is_json==1 ? '[': '{';
+  size_t offset = 1;
+
+  for (int i = 0; i < len; ++i)
+    offset += snprintf(out + offset, buf_size - offset, "%d%s", arr[i], (i < len - 1) ? "," : is_json==1 ? "]": "}");
+
+  return out;
+}
+
+char* ArrayToString_str(char** arr, int len, int is_json)
+{
+  if (!arr || len <= 0) return strdup("{}");
+
+  size_t buf_size = 2;  // for '{' and '}'
+  for (int i = 0; i < len; ++i) {
+    const char* val = arr[i] ? arr[i] : "null";
+    buf_size += strlen(val) + 4;  // quotes + comma
+  }
+
+  char* out = malloc(buf_size);
+  if (!out) return NULL;
+
+  out[0] = is_json==1 ? '[': '{';
+  size_t offset = 1;
+
+  for (int i = 0; i < len; ++i) {
+    const char* val = arr[i] ? arr[i] : "null";
+    offset += snprintf(out + offset, buf_size - offset, "\"%s\"%s", val, (i < len - 1) ? "," : is_json==1 ? "]": "}");
+  }
+
+  out[offset] = '\0'; // make sure it's null-terminated
+  return out;
+}
+
+
+void* ParseArray(const char* value, ArrayElementType type, size_t* out_len)
+{
+  if (!value || value[0] != '{') {
+    *out_len = 0;
+    return NULL;
+  }
+
+  char* tmp = strdup(value + 1);  // skip '{'
+  char* end_brace = strchr(tmp, '}');
+  if (end_brace) *end_brace = '\0';
+
+  size_t capacity = 8;
+  size_t count = 0;
+  void* result = NULL;
+
+  if (type == ARRAY_TYPE_INT) {
+    int* arr = malloc(capacity * sizeof(int));
+    char* token = strtok(tmp, ",");
+
+    while (token) {
+      if (count >= capacity) {
+        capacity *= 2;
+        arr = realloc(arr, capacity * sizeof(int));
+      }
+      arr[count++] = atoi(token);
+      token = strtok(NULL, ",");
+    }
+
+    result = arr;
+
+  } else if (type == ARRAY_TYPE_STRING) {
+    char** arr = malloc(capacity * sizeof(char*));
+    char* token = strtok(tmp, ",");
+
+    while (token) {
+      if (count >= capacity) {
+        capacity *= 2;
+        arr = realloc(arr, capacity * sizeof(char*));
+      }
+
+      // Strip surrounding quotes if any
+      size_t len = strlen(token);
+      if (token[0] == '"') {
+        token[len - 1] = '\0';
+        token++;
+      }
+
+      arr[count++] = strdup(token);
+      token = strtok(NULL, ",");
+    }
+
+    result = arr;
+  }
+
+  *out_len = count;
+  free(tmp);
+  return result;
+}
+
 const char* SqlToCType(const char *sql_type)
 {
   // Handle arrays first
-  if (strstr(sql_type, "[]") != NULL)
-    return "char*"; // Use char* to hold PostgreSQL array like "{1,2,3}"
+  if (strstr(sql_type, "[]") != NULL) {
+    if (strncmp(sql_type, "INT", 3) == 0)
+      return "int*";
+    if (strncmp(sql_type, "TEXT", 4) == 0 || strncmp(sql_type, "VARCHAR", 7) == 0)
+      return "char**";
+    return "char*"; // fallback for unknown array types
+  }
 
   // Prefix matches for known types
   if (strncmp(sql_type, "SMALLINT", 8) == 0) return "short";
@@ -196,6 +314,8 @@ void BuildAllCodegenPieces(const Column* columns, size_t count, const char* tabl
       sprintf(out->value_args + strlen(out->value_args), "u.%s ? \"TRUE\" : \"FALSE\"", name);
     else if (strcmp(c_type, "void*") == 0)
       sprintf(out->value_args + strlen(out->value_args), "(char*)u.%s", name);
+    else if (strcmp(c_type, "int*") == 0 || strcmp(c_type, "char**") == 0)
+      sprintf(out->value_args + strlen(out->value_args), "u.%s ? ArrayToString(u.%s, u.%s_len, 0) : \"null\"", name, name, name);
     else
       sprintf(out->value_args + strlen(out->value_args), "u.%s", name);
 
@@ -218,26 +338,47 @@ void BuildAllCodegenPieces(const Column* columns, size_t count, const char* tabl
       sprintf(out->update_args + strlen(out->update_args), "u.%s ? \"TRUE\" : \"FALSE\"", name);
     else if (strcmp(c_type, "void*") == 0)
       sprintf(out->update_args + strlen(out->update_args), "(char*)u.%s", name);
+    else if (strcmp(c_type, "int*") == 0 || strcmp(c_type, "char**") == 0)
+      sprintf(out->update_args + strlen(out->update_args), "u.%s ? ArrayToString(u.%s, u.%s_len, 0) : \"null\"", name, name, name);
     else
       sprintf(out->update_args + strlen(out->update_args), "u.%s", name);
 
     // --- field_assignments ---
     char line[512];
-    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0 || strcmp(c_type, "long long") == 0) {
+    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0 || strcmp(c_type, "long long") == 0)
+    {
       snprintf(line, sizeof(line),
-        "    if (strcmp(colname, \"%s\") == 0) list[i].%s = atoi(value);\n",
+        "      if (strcmp(colname, \"%s\") == 0) list[i].%s = atoi(value);\n",
         name, name);
-    } else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0) {
+    }
+    else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0)
+    {
       snprintf(line, sizeof(line),
-        "    if (strcmp(colname, \"%s\") == 0) list[i].%s = atof(value);\n",
+        "      if (strcmp(colname, \"%s\") == 0) list[i].%s = atof(value);\n",
         name, name);
-    } else if (strcmp(c_type, "bool") == 0) {
+    }
+    else if (strcmp(c_type, "bool") == 0)
+    {
       snprintf(line, sizeof(line),
-        "    if (strcmp(colname, \"%s\") == 0) list[i].%s = (strcmp(value, \"t\") == 0);\n",
+        "      if (strcmp(colname, \"%s\") == 0) list[i].%s = (strcmp(value, \"t\") == 0);\n",
         name, name);
-    } else {
+    } 
+    else if (strcmp(c_type, "int*") == 0)
+    {
       snprintf(line, sizeof(line),
-        "    if (strcmp(colname, \"%s\") == 0) list[i].%s = strdup(value);\n",
+        "      if (strcmp(colname, \"%s\") == 0) list[i].%s = (int*) ParseArray(value, ARRAY_TYPE_INT, &list[i].%s_len);\n",
+        name, name, name);
+    }
+    else if (strcmp(c_type, "char**") == 0)
+    {
+      snprintf(line, sizeof(line),
+        "      if (strcmp(colname, \"%s\") == 0) list[i].%s = (char**) ParseArray(value, ARRAY_TYPE_STRING, &list[i].%s_len);\n",
+        name, name, name);
+    }
+    else
+    {
+      snprintf(line, sizeof(line),
+        "      if (strcmp(colname, \"%s\") == 0) list[i].%s = strdup(value);\n",
         name, name);
     }
     strcat(out->field_assignments, line);
@@ -267,7 +408,7 @@ void BuildAllCodegenPieces(const Column* columns, size_t count, const char* tabl
     else if (strstr(sql_type, "[]") != NULL)
     {
       sprintf(out->serialize_args + strlen(out->serialize_args),
-        "(u.%s ? ({ const char *src = u.%s; size_t len = strlen(src); char *tmp = malloc(len + 3); if (!tmp) tmp = \"[]\"; else { tmp[0] = '['; strncpy(tmp + 1, src + 1, len - 2); tmp[len - 1] = ']'; tmp[len] = '\\0'; } tmp; }) : \"null\")",
+        "ArrayToString(u.%s, u.%s_len, 1)",
         name,
         name
       );
@@ -279,6 +420,10 @@ void BuildAllCodegenPieces(const Column* columns, size_t count, const char* tabl
         name
       );
     } 
+    else if (strncmp(sql_type, "BYTEA", 5) == 0)
+    {
+      sprintf(out->serialize_args + strlen(out->serialize_args), "(u.%s ? SanitizeHexForJSON(u.%s) : %s)", name, name, GetDefaultValue(c_type));
+    }
     else
     {
       sprintf(out->serialize_args + strlen(out->serialize_args), "(u.%s ? u.%s : %s)", name, name, GetDefaultValue(c_type));
@@ -305,8 +450,21 @@ void CreateHeader(
   for (size_t i = 0; i < column_sizes; i++) {
     const char* c_type = SqlToCType(columns[i].type);
     char line[128];
+    char second_line[128];
+    second_line[0] = '\0';
+    
     snprintf(line, sizeof(line), "  %s %s;\n", c_type, columns[i].name);
+    
+    if (strcmp(c_type, "int*") == 0 || strcmp(c_type, "char**") == 0)
+    {
+      snprintf(second_line, sizeof(second_line), "  size_t %s_len;\n", columns[i].name);
+    }
+    
     strcat(struct_fields, line);
+    if (second_line[0] != '\0')
+    {
+      strcat(struct_fields, second_line);
+    }
   }
 
   char *template = strdup(CRUD_HEADER_TEMPLATE);
@@ -505,7 +663,7 @@ void ParseConfig(const char *config_path, PogPoolConfig *config)
 
 void GenerateModelFilesFromConfig()
 {
-  const char *config_path = "example/pog_pool_config.yml";
+  const char *config_path = "pog_pool_config.yml";
   PogPoolConfig pogPoolConfig = {0};
 
   ParseConfig(config_path, &pogPoolConfig);

@@ -24,6 +24,12 @@
 #define CREATE_TABLE 13
 #define IS_CREATE_TABLE(str) (strncmp(str, "CREATE TABLE", 12) == 0)
 
+// This is so we can turn lists back into psotgres version
+#define ArrayToString(arr, len, is_json) \
+  _Generic((arr), \
+    int*: ArrayToString_int, \
+    char**: ArrayToString_str \
+  )(arr, len, is_json)
 
 typedef struct {
   char name[COLUNM_LEN];
@@ -48,12 +54,21 @@ typedef struct {
   char serialize_args[2048];
 } CodegenOutput;
 
+typedef enum {
+  ARRAY_TYPE_INT,
+  ARRAY_TYPE_STRING
+} ArrayElementType;
+
 // TODO: Split these up?
 // Helper functions 
 const char* SqlToCType(const char *sql_type); 
 char* SkipSpaces(char *p); 
 int GetWord(char *line, char *word);
 pid_t* PIDStatus(const char *model_dir, const struct dirent *entry, FILE *models_header, const char *output_folder);
+char* SanitizeHexForJSON(const char* input);
+char* ArrayToString_int(const int* arr, int len, int is_json);
+char* ArrayToString_str(char** arr, int len, int is_json);
+void* ParseArray(const char* value, ArrayElementType type, size_t* out_len);
 
 // Core SQL to C logic
 void CreateCRUDFiles(const char *table_name, const Column *columns, size_t column_sizes, const char *output_folder); 
