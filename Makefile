@@ -35,7 +35,8 @@ endif
 
 # Need to use find since we create these models. I auto set it to build path.
 example: example/main.c auto_generate pog_pool 
-	$(CC) example/main.c $(shell find $(BUILD_DIR) -name 'model_*.c')  $(CFLAGS) -Lbuild -lpog_pool -o $(BIN_DIR)/main
+	$(CC) example/main.c $(shell find $(BUILD_DIR) -name 'model_*.c')  $(CFLAGS) -Lbuild -lpog_pool -o $(BIN_DIR)/main && \
+	./$(BIN_DIR)/main
 
 auto_generate: pog_pool | $(BIN_DIR)
 	$(CC) example/generate_models.c $(CFLAGS) -Lbuild -lpog_pool -o $(BIN_DIR)/auto_generate && \

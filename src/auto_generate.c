@@ -345,10 +345,16 @@ void BuildAllCodegenPieces(const Column* columns, size_t count, const char* tabl
 
     // --- field_assignments ---
     char line[512];
-    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0 || strcmp(c_type, "long long") == 0)
+    if (strcmp(c_type, "int") == 0 || strcmp(c_type, "short") == 0)
     {
       snprintf(line, sizeof(line),
         "      if (strcmp(colname, \"%s\") == 0) list[i].%s = atoi(value);\n",
+        name, name);
+    }
+    else if (strcmp(c_type, "long long") == 0)
+    {
+      snprintf(line, sizeof(line),
+        "      if (strcmp(colname, \"%s\") == 0) list[i].%s = atoll(value);\n",
         name, name);
     }
     else if (strcmp(c_type, "float") == 0 || strcmp(c_type, "double") == 0)

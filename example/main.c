@@ -1,12 +1,13 @@
 #include "pog_pool/connection.h"
 #include "pog_pool/auto_generate.h"
 #include "../build/models.h"
+#include <assert.h>
+#include <string.h>
+#include <stdio.h>
 
 volatile ConnectionPool* connection_pool;
 
-int main()
-{
-  // assumping you are running make from make folder
+int main() {
   const char *config_path = "./example/pog_pool_config.yml";
   PogPoolConfig pogPoolConfig = {0};
 
@@ -19,6 +20,9 @@ int main()
   PGconn *pg_conn = BorrowConnection(connection_pool);
   RunSQLFile(pg_conn, "models/ExampleTable.sql");
 
+  // This clean up is needed incase test failed then we need to delete it again.
+  DeleteExampleTable(pg_conn, "id='b6d4c431-f327-4a4a-9345-320aa3cd7e31'");
+
   ExampleTable example = {
     .id = "b6d4c431-f327-4a4a-9345-320aa3cd7e31",
     .small_int_col = 1,
@@ -29,103 +33,62 @@ int main()
     .real_col = 1.23,
     .double_col = 9.87,
     .serial_col = NULL,
-  
     .char_col = "char_data",
     .varchar_col = "varchar_data",
     .text_col = "This is a long text",
-  
     .date_col = "2025-06-05",
     .time_col = "12:34:56",
     .timestamp_col = "2025-06-05 12:34:56",
     .timestamptz_col = "2025-06-05 12:34:56+00",
-  
     .boolean_col = 1,
     .another_uuid = "d1b355c0-f348-4bcf-b3df-ef95b3a8a3ad",
-  
     .json_col = "{\"key\": \"value\"}",
     .jsonb_col = "{\"key\": \"value\"}",
-  
-    .int_array_col = (int[]){1,2,3},
+    .int_array_col = (int[]){1, 2, 3},
     .int_array_col_len = 3,
-    .text_array_col = (char* []){"apple","banana"},
+    .text_array_col = (char*[]){"apple", "banana"},
     .text_array_col_len = 2,
-  
     .status_col = "active",
-    .file_col = "\\x68656c6c6f" 
+    .file_col = "68656c6c6f"
   };
 
-  printf("\n\n\n---INSERT---\n\n\n");
-  if (InsertExampleTable(pg_conn, example) == 1)
-  {
-    printf("\n\n\nINSERT FAILED\n\n\n");
-    return 0;
-  }
+  // Insert
+  ExecStatusType insert_status = InsertExampleTable(pg_conn, example).status;
+  assert(insert_status != PGRES_FATAL_ERROR && "Insert failed");
 
-  ExampleTableQuery et;
-  ExampleTable* e;
+  // Query
+  ExampleTableQuery et = QueryExampleTable(pg_conn, "*", "1=1");
+  assert(et.ExampleTable != NULL);
+  ExampleTable *e = et.ExampleTable;
 
-  printf("\n\n\n---QUERY ALL---\n\n\n");
-  et = QueryExampleTable(pg_conn, "*", "1=1");
-  if (et.ExampleTable != NULL)
-  {
-    e = et.ExampleTable;
-  
-    printf("id: %s\n", e->id);
-    printf("small_int_col: %d\n", e->small_int_col);
-    printf("int_col: %d\n", e->int_col);
-    printf("big_int_col: %lld\n", e->big_int_col);
-    printf("decimal_col: %.2f\n", e->decimal_col);
-    printf("numeric_col: %.3f\n", e->numeric_col);
-    printf("real_col: %i\n", e->real_col);  // stored as string
-    printf("double_col: %f\n", e->double_col);
-    // serial_col is auto-generated — skip or print if needed
-    // printf("serial_col: %s\n", (char*)e->serial_col);
-  
-    printf("char_col: %s\n", e->char_col);
-    printf("varchar_col: %s\n", e->varchar_col);
-    printf("text_col: %s\n", e->text_col);
-  
-    printf("date_col: %s\n", e->date_col);
-    printf("time_col: %s\n", e->time_col);
-    printf("timestamp_col: %s\n", e->timestamp_col);
-    printf("timestamptz_col: %s\n", e->timestamptz_col);
-  
-    printf("boolean_col: %s\n", e->boolean_col ? "TRUE" : "FALSE");
-    printf("another_uuid: %s\n", e->another_uuid);
-  
-    printf("json_col: %s\n", (char*)e->json_col);
-    printf("jsonb_col: %s\n", (char*)e->jsonb_col);
-  
-    printf("int_array_col[0]: %d\n", e->int_array_col[0]);
-    printf("text_array_col[0]: %s\n", e->text_array_col[0]);
-  
-    printf("status_col: %s\n", (char*)e->status_col);
-    printf("file_col (hex): %s\n", (char*)e->file_col);
-  }
-  else
-  {
-    printf("Does not exist...\n");
-  }
+  // Assert values
+  assert(strcmp(e->id, example.id) == 0);
+  assert(e->int_col == 42);
+  assert(e->big_int_col == 9000000000LL);
+  printf("%s   char_data\n", e->char_col);
+  assert(strncmp(e->char_col, "char_data", 9) == 0);
+  assert(strncmp(e->text_array_col[1], "banana", 6) == 0);
+  assert(e->int_array_col[0] == 1);
 
-  // Update and get name 
-  printf("\n\n\n---UPDATE---\n\n\n");
+  // Update
   e->char_col = "updated";
-  UpdateExampleTable(pg_conn, *e, "id=\'b6d4c431-f327-4a4a-9345-320aa3cd7e51\'");
-  printf("Query only updated value\n");
-  et = QueryExampleTable(pg_conn, "char_col", "1=1");
-  if (et.ExampleTable != NULL)
-  {
-    printf("char_col: %s", et.ExampleTable->char_col);
-  }
+  ExecStatusType update_status = UpdateExampleTable(pg_conn, *e, "id='b6d4c431-f327-4a4a-9345-320aa3cd7e31'").status;
+  assert(update_status != PGRES_FATAL_ERROR && "Update failed");
 
-  printf("\n\n\n--- Serialized it ---\n\n\n");
-  printf("Result: %s\n", SerializeExampleTable(*e));
+  // Query updated value
+  ExampleTableQuery updated = QueryExampleTable(pg_conn, "char_col", "id='b6d4c431-f327-4a4a-9345-320aa3cd7e31'");
+  assert(strncmp(updated.ExampleTable->char_col, "updated", 7) == 0);
 
+  // Serialize
+  char *json = SerializeExampleTable(*e);
+  assert(json && "Serialization failed");
+  printf("Serialized: %s\n", json);
 
-  char where_clause[512];
-  sprintf(where_clause, "id = \'%s\'\n", example.id);
+  // Cleanup
+  char where_clause[128];
+  snprintf(where_clause, sizeof(where_clause), "id='%s'", example.id);
   DeleteExampleTable(pg_conn, where_clause);
-  
+
+  printf("✅ All tests passed\n");
   return 0;
 }
-
