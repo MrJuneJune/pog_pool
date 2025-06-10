@@ -2,14 +2,17 @@
 
 void InitPool(volatile ConnectionPool *pool, const char *conninfo)
 {
-  for (int i = 0; i < MAX_CONNECTIONS; i++) {
+  for (int i = 0; i < MAX_CONNECTIONS; i++)
+  {
     pool->connections[i] = NULL;
   }
   pool->num_connections = 0;
   
-  for (int i = 0; i < MAX_CONNECTIONS; i++) {
+  for (int i = 0; i < MAX_CONNECTIONS; i++)
+  {
     pool->connections[i] = PQconnectdb(conninfo);
-    if (PQstatus(pool->connections[i]) != CONNECTION_OK) {
+    if (PQstatus(pool->connections[i]) != CONNECTION_OK)
+    {
       printf("Connection to database failed: %s\n", PQerrorMessage(pool->connections[i]));
       exit(1);
     }
@@ -17,7 +20,7 @@ void InitPool(volatile ConnectionPool *pool, const char *conninfo)
   }
 }
 
-PGconn* BorrowConnection(volatile ConnectionPool *pool)
+PGconn *BorrowConnection(volatile ConnectionPool *pool)
 {
   if (pool->num_connections == 0)
   {
@@ -39,7 +42,8 @@ void ReleaseConnection(volatile ConnectionPool *pool, PGconn *conn)
 
 void ClosePool(volatile ConnectionPool *pool)
 {
-  for (int i = 0; i < pool->num_connections; i++) {
+  for (int i = 0; i < pool->num_connections; i++)
+  {
     PQfinish(pool->connections[i]);
   }
   pool->num_connections = 0;
@@ -49,7 +53,8 @@ void ClosePool(volatile ConnectionPool *pool)
 void RunSQLFile(PGconn *conn, const char *filename)
 {
   FILE *file = fopen(filename, "r");
-  if (!file) {
+  if (!file)
+  {
     perror("Failed to open SQL file");
     exit(EXIT_FAILURE);
   }
@@ -64,7 +69,8 @@ void RunSQLFile(PGconn *conn, const char *filename)
   fclose(file);
 
   PGresult *res = PQexec(conn, query);
-  if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+  if (PQresultStatus(res) != PGRES_COMMAND_OK)
+  {
     fprintf(stderr, "SQL execution failed: %s\n", PQerrorMessage(conn));
     PQclear(res);
     free(query);

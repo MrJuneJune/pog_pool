@@ -5,9 +5,10 @@
 #include <string.h>
 #include <stdio.h>
 
-volatile ConnectionPool* connection_pool;
+volatile ConnectionPool *connection_pool;
 
-int main() {
+int main()
+{
   const char *config_path = "./example/pog_pool_config.yml";
   PogPoolConfig pogPoolConfig = {0};
 

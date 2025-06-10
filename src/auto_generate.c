@@ -3,23 +3,24 @@
 #include "pog_pool/crud_src_template.h"
 
 
-char* SanitizeHexForJSON(const char* input)
+char *SanitizeHexForJSON(const char *input)
 {
   if (!input) return "none";
 
-  if (strncmp(input, "\\x", 2) == 0) {
+  if (strncmp(input, "\\x", 2) == 0)
+  {
     return strdup(input + 2);  
   }
 
   return strdup(input); 
 }
 
-char* ArrayToString_int(const int* arr, int len, int is_json)
+char *ArrayToString_int(const int *arr, int len, int is_json)
 {
   if (!arr || len <= 0) return strdup("{}");
 
-  size_t buf_size = len * 12 + 2;
-  char* out = malloc(buf_size);
+  size_t buf_size = len *12 + 2;
+  char *out = malloc(buf_size);
   if (!out) return NULL;
 
   out[0] = is_json==1 ? '[': '{';
@@ -31,24 +32,26 @@ char* ArrayToString_int(const int* arr, int len, int is_json)
   return out;
 }
 
-char* ArrayToString_str(char** arr, int len, int is_json)
+char *ArrayToString_str(char** arr, int len, int is_json)
 {
   if (!arr || len <= 0) return strdup("{}");
 
   size_t buf_size = 2;  // for '{' and '}'
-  for (int i = 0; i < len; ++i) {
-    const char* val = arr[i] ? arr[i] : "null";
+  for (int i = 0; i < len; ++i)
+  {
+    const char *val = arr[i] ? arr[i] : "null";
     buf_size += strlen(val) + 4;  // quotes + comma
   }
 
-  char* out = malloc(buf_size);
+  char *out = malloc(buf_size);
   if (!out) return NULL;
 
   out[0] = is_json==1 ? '[': '{';
   size_t offset = 1;
 
-  for (int i = 0; i < len; ++i) {
-    const char* val = arr[i] ? arr[i] : "null";
+  for (int i = 0; i < len; ++i)
+  {
+    const char *val = arr[i] ? arr[i] : "null";
     offset += snprintf(out + offset, buf_size - offset, "\"%s\"%s", val, (i < len - 1) ? "," : is_json==1 ? "]": "}");
   }
 
@@ -57,29 +60,33 @@ char* ArrayToString_str(char** arr, int len, int is_json)
 }
 
 
-void* ParseArray(const char* value, ArrayElementType type, size_t* out_len)
+void *ParseArray(const char *value, ArrayElementType type, size_t *out_len)
 {
-  if (!value || value[0] != '{') {
+  if (!value || value[0] != '{')
+  {
     *out_len = 0;
     return NULL;
   }
 
-  char* tmp = strdup(value + 1);  // skip '{'
-  char* end_brace = strchr(tmp, '}');
+  char *tmp = strdup(value + 1);  // skip '{'
+  char *end_brace = strchr(tmp, '}');
   if (end_brace) *end_brace = '\0';
 
   size_t capacity = 8;
   size_t count = 0;
-  void* result = NULL;
+  void *result = NULL;
 
-  if (type == ARRAY_TYPE_INT) {
-    int* arr = malloc(capacity * sizeof(int));
-    char* token = strtok(tmp, ",");
+  if (type == ARRAY_TYPE_INT)
+  {
+    int *arr = malloc(capacity *sizeof(int));
+    char *token = strtok(tmp, ",");
 
-    while (token) {
-      if (count >= capacity) {
+    while (token)
+    {
+      if (count >= capacity)
+      {
         capacity *= 2;
-        arr = realloc(arr, capacity * sizeof(int));
+        arr = realloc(arr, capacity *sizeof(int));
       }
       arr[count++] = atoi(token);
       token = strtok(NULL, ",");
@@ -87,19 +94,24 @@ void* ParseArray(const char* value, ArrayElementType type, size_t* out_len)
 
     result = arr;
 
-  } else if (type == ARRAY_TYPE_STRING) {
-    char** arr = malloc(capacity * sizeof(char*));
-    char* token = strtok(tmp, ",");
+  }
+  else if (type == ARRAY_TYPE_STRING)
+  {
+    char** arr = malloc(capacity *sizeof(char*));
+    char *token = strtok(tmp, ",");
 
-    while (token) {
-      if (count >= capacity) {
+    while (token)
+    {
+      if (count >= capacity)
+      {
         capacity *= 2;
-        arr = realloc(arr, capacity * sizeof(char*));
+        arr = realloc(arr, capacity *sizeof(char*));
       }
 
       // Strip surrounding quotes if any
       size_t len = strlen(token);
-      if (token[0] == '"') {
+      if (token[0] == '"')
+      {
         token[len - 1] = '\0';
         token++;
       }
@@ -116,10 +128,11 @@ void* ParseArray(const char* value, ArrayElementType type, size_t* out_len)
   return result;
 }
 
-const char* SqlToCType(const char *sql_type)
+const char *SqlToCType(const char *sql_type)
 {
   // Handle arrays first
-  if (strstr(sql_type, "[]") != NULL) {
+  if (strstr(sql_type, "[]") != NULL)
+  {
     if (strncmp(sql_type, "INT", 3) == 0)
       return "int*";
     if (strncmp(sql_type, "TEXT", 4) == 0 || strncmp(sql_type, "VARCHAR", 7) == 0)
@@ -155,7 +168,7 @@ const char* SqlToCType(const char *sql_type)
   return "char*";
 }
 
-char* SkipSpaces(char *p)
+char *SkipSpaces(char *p)
 {
   while (*p == ' ' || *p == '\t') p++;
   return p;
@@ -183,7 +196,7 @@ size_t GetFileSize(FILE *file)
   return file_size;
 }
 
-char* ReadTemplate(const char *file_path)
+char *ReadTemplate(const char *file_path)
 {
   FILE *file = fopen(file_path, "r");
   if (!file)
@@ -193,7 +206,7 @@ char* ReadTemplate(const char *file_path)
   }
 
   size_t file_size = GetFileSize(file);
-  char *buffer = malloc(file_size*3 + 1);
+  char *buffer = malloc(file_size *3 + 1);
   if (!buffer)
   {
     fprintf(stderr, "Memory allocation failed\n");
@@ -207,14 +220,14 @@ char* ReadTemplate(const char *file_path)
   return buffer;
 }
 
-char* ReplaceAllChar(const char* buffer, const char* placeholder, const char* value)
+char *ReplaceAllChar(const char *buffer, const char *placeholder, const char *value)
 {
   size_t buffer_len = strlen(buffer);
   size_t placeholder_len = strlen(placeholder);
   size_t value_len = strlen(value);
 
   size_t count = 0;
-  const char* tmp = buffer;
+  const char *tmp = buffer;
 
   // Count occurrences
   while ((tmp = strstr(tmp, placeholder)))
@@ -225,11 +238,11 @@ char* ReplaceAllChar(const char* buffer, const char* placeholder, const char* va
 
   // Compute new size
   size_t new_size = buffer_len + count * (value_len - placeholder_len) + 1;
-  char* result = malloc(new_size);
+  char *result = malloc(new_size);
   if (!result) return NULL;
 
-  const char* src = buffer;
-  char* dst = result;
+  const char *src = buffer;
+  char *dst = result;
   while ((tmp = strstr(src, placeholder)))
   {
     size_t chunk_len = tmp - src;
@@ -252,7 +265,7 @@ void ReplaceAll(char **buffer, const char *placeholder, const char *value)
   *buffer = new_str;
 }
 
-char* GetDefaultValue(const char *c_type)
+char *GetDefaultValue(const char *c_type)
 {
   if 
   (
@@ -266,7 +279,7 @@ char* GetDefaultValue(const char *c_type)
   return "\"null\"";
 }
 
-void BuildAllCodegenPieces(const Column* columns, size_t count, const char* table_name, CodegenOutput* out)
+void BuildAllCodegenPieces(const Column *columns, size_t count, const char *table_name, CodegenOutput *out)
 {
   strcpy(out->column_names, "(");
   out->format_parts[0] = '\0';
@@ -282,10 +295,11 @@ void BuildAllCodegenPieces(const Column* columns, size_t count, const char* tabl
   int first_update = 1;
   int first_json = 1;
 
-  for (size_t i = 0; i < count; i++) {
-    const char* name = columns[i].name;
-    const char* sql_type = columns[i].type;
-    const char* c_type = SqlToCType(sql_type);
+  for (size_t i = 0; i < count; i++)
+  {
+    const char *name = columns[i].name;
+    const char *sql_type = columns[i].type;
+    const char *c_type = SqlToCType(sql_type);
 
     // Skip SERIAL columns
     if (strcmp(sql_type, "SERIAL") == 0)
@@ -446,15 +460,16 @@ void BuildAllCodegenPieces(const Column* columns, size_t count, const char* tabl
 }
 
 void CreateHeader(
-  FILE* file_out_p,
-  const char* table_name,
+  FILE *file_out_p,
+  const char *table_name,
   const Column *columns,
   const size_t column_sizes
 )
 {
   char struct_fields[2048] = {0};
-  for (size_t i = 0; i < column_sizes; i++) {
-    const char* c_type = SqlToCType(columns[i].type);
+  for (size_t i = 0; i < column_sizes; i++)
+  {
+    const char *c_type = SqlToCType(columns[i].type);
     char line[128];
     char second_line[128];
     second_line[0] = '\0';
@@ -481,8 +496,8 @@ void CreateHeader(
 }
 
 void CreateSrc(
-  FILE* file_out_p,
-  const char* table_name,
+  FILE *file_out_p,
+  const char *table_name,
   const Column *columns,
   const size_t column_sizes
 )
@@ -516,7 +531,8 @@ void CreateCRUDFiles(
   const Column *columns,
   size_t column_sizes,
   const char *output_folder
-) {
+)
+{
   char header_file_name[1024];
   char src_file_name[1024];
   FILE *src_file_out_p;
@@ -533,7 +549,8 @@ void CreateCRUDFiles(
 
   snprintf(src_file_name, sizeof(src_file_name), "%s/model_%s.c", output_folder, table_name);
   src_file_out_p = fopen(src_file_name, "w");
-  if (!src_file_out_p) {
+  if (!src_file_out_p)
+  {
     perror("fopen source");
     return;
   }
@@ -582,7 +599,7 @@ void SetModelHeader(FILE *models_header)
   fprintf(models_header, "#ifndef MODELS_H\n#define MODELS_H\n\n");
 }
 
-pid_t* PIDStatus(
+pid_t *PIDStatus(
   const char *model_dir,
   const struct dirent *entry,
   FILE *models_header,
@@ -618,7 +635,8 @@ pid_t* PIDStatus(
 void EnsureDefaultConfig(const char *config_path)
 {
   FILE *file = fopen(config_path, "w");
-  if (file == NULL) {
+  if (file == NULL)
+  {
     perror("Failed to create config");
     exit(1);
   }
@@ -643,7 +661,8 @@ void ParseConfig(const char *config_path, PogPoolConfig *config)
   }
 
   char line[512];
-  while (fgets(line, sizeof(line), file)) {
+  while (fgets(line, sizeof(line), file))
+  {
     char *key = strtok(line, ":");
     char *value = SkipSpaces(strtok(NULL, "\n"));
     if (key && value)
@@ -698,7 +717,8 @@ void GenerateModelFilesFromConfig()
   while ((entry = readdir(dir)) != NULL)
   {
     if (entry->d_type == DT_REG && strstr(entry->d_name, ".swp")) continue;
-    if (entry->d_type == DT_REG && strstr(entry->d_name, ".sql")) {
+    if (entry->d_type == DT_REG && strstr(entry->d_name, ".sql"))
+    {
       PIDStatus(pogPoolConfig.input_dir, entry, models_header, pogPoolConfig.output_dir);
     }
   }

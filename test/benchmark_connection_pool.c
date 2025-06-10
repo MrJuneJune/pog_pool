@@ -10,20 +10,24 @@
 // This can be from 
 const char *CONNINFO = "postgres://pog_pool:pog_pool@localhost:4269/pog_pool";
 
-double NowSeconds() {
+double NowSeconds()
+{
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
   return ts.tv_sec + ts.tv_nsec / 1e9;
 }
 
-void RunQuery(PGconn *conn) {
-  PGresult *res = PQexec(conn, "SELECT * FROM ExampleTable");
+void RunQuery(PGconn *conn)
+{
+  PGresult *res = PQexec(conn, "SELECT *FROM ExampleTable");
   PQclear(res);
 }
 
-void TestWithPool(ConnectionPool pool) {
+void TestWithPool(ConnectionPool pool)
+{
   double start = NowSeconds();
-  for (int i = 0; i < N_QUERIES; i++) {
+  for (int i = 0; i < N_QUERIES; i++)
+  {
     PGconn *conn = BorrowConnection(&pool);
     RunQuery(conn);
     ReleaseConnection(&pool, conn);
@@ -32,11 +36,14 @@ void TestWithPool(ConnectionPool pool) {
   // printf("Using pool: %.4f seconds for %d queries\n", end - start, N_QUERIES);
 }
 
-void TestWithoutPool() {
+void TestWithoutPool()
+{
   double start = NowSeconds();
-  for (int i = 0; i < N_QUERIES; i++) {
+  for (int i = 0; i < N_QUERIES; i++)
+  {
     PGconn *conn = PQconnectdb(CONNINFO);
-    if (PQstatus(conn) != CONNECTION_OK) {
+    if (PQstatus(conn) != CONNECTION_OK)
+    {
       fprintf(stderr, "Connection failed: %s\n", PQerrorMessage(conn));
       PQfinish(conn);
       exit(1);
@@ -49,7 +56,8 @@ void TestWithoutPool() {
   printf("Without pool: %.4f seconds for %d queries\n", end - start, N_QUERIES);
 }
 
-int main() {
+int main()
+{
   ConnectionPool pool;
   InitPool(&pool, CONNINFO);
 
@@ -63,7 +71,7 @@ int main() {
     total += (end - start);
   }
 
-  printf("Average time over %d runs: %.4f ms\n", n_loops, (total / (n_loops * N_QUERIES) * 1000));
+  printf("Average time over %d runs: %.4f ms\n", n_loops, (total / (n_loops *N_QUERIES) * 1000));
 
   ClosePool(&pool);
 
