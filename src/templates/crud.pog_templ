@@ -109,3 +109,16 @@ char* Serialize{{STRUCT_NAME}}({{STRUCT_NAME}} u)
   return buffer;
 }
 
+void Free{{STRUCT_NAME}}Query({{STRUCT_NAME}}Query *query_result)
+{
+  if (!query_result) return;
+
+  if (query_result->{{TABLE_NAME}} != NULL)
+  {
+    free(query_result->{{TABLE_NAME}});
+    query_result->{{TABLE_NAME}} = NULL;
+  }
+
+  // So they know 
+  query_result->status = PGRES_FATAL_ERROR;
+}

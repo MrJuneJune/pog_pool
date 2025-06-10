@@ -89,6 +89,9 @@ int main()
   char where_clause[128];
   snprintf(where_clause, sizeof(where_clause), "id='%s'", example.id);
   DeleteExampleTable(pg_conn, where_clause);
+  
+  FreeExampleTableQuery(&et);
+  FreeExampleTableQuery(&updated);
 
   printf("✅ All tests passed\n");
   return 0;
