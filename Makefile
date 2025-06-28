@@ -9,6 +9,7 @@ INCLUDE_DIR = include/pog_pool
 SRC_DIR = src
 BUILD_DIR = build
 TEMPLATE_DIR = templates
+DIST_DIR = dist
 
 THIRD_PARTY_PREFIX := $(CURDIR)/third_party
 THIRD_PARTY_INCLUDE_DIR := $(THIRD_PARTY_PREFIX)/include
@@ -23,15 +24,13 @@ ifeq ($(UNAME_S),Darwin)
 else
   POSTGRES_SRC := install_libpq_linux
   SHARED_LIB := $(BUILD_DIR)/libpog_pool.so
-  DYNAMICALLY_PATH := -Wl,-rpath,$(CURDIR)/build
+  DYNAMICALLY_PATH := -Wl,-rpath,$(CURDIR)/build -Wl,-soname,libpog_pool.so
   SHARED_FLAGS := -shared -Wl $(DYNAMICALLY_PATH) -Iinclude 
 endif
 
-all: debug
-
-release: pog_pool 
-	cp -r include/* dist/include
-	cp $(BUILD_DIR)/libpog_pool.a dist 
+release: pog_pool  | $(DIST_DIR)
+	cp -r include/* $(DIST_DIR)/include
+	cp $(BUILD_DIR)/libpog_pool.a $(DIST_DIR) 
 
 bench_mark: pog_pool_benchmark python_benchmark
 
@@ -130,5 +129,8 @@ $(BIN_DIR):
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
+$(DIST_DIR):
+	mkdir -p $(DIST_DIR)
+
 clean:
-	rm -rf $(BIN_DIR) $(BUILD_DIR) dist
+	rm -rf $(BIN_DIR) $(BUILD_DIR) $(DIST_DIR)
