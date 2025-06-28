@@ -229,14 +229,12 @@ char *ReplaceAllChar(const char *buffer, const char *placeholder, const char *va
   size_t count = 0;
   const char *tmp = buffer;
 
-  // Count occurrences
   while ((tmp = strstr(tmp, placeholder)))
   {
     count++;
     tmp += placeholder_len;
   }
 
-  // Compute new size
   size_t new_size = buffer_len + count * (value_len - placeholder_len) + 1;
   char *result = malloc(new_size);
   if (!result) return NULL;
@@ -252,9 +250,9 @@ char *ReplaceAllChar(const char *buffer, const char *placeholder, const char *va
     dst += value_len;
     src = tmp + placeholder_len;
   }
-  strcpy(dst, src); // copy remaining tail
+  strcpy(dst, src);
 
-  return result; // caller must free
+  return result; 
 }
 
 
