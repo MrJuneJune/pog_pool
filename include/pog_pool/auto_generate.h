@@ -78,6 +78,9 @@ void GenerateModelFilesFromConfig();
 // Configuration related
 void EnsureDefaultConfig(const char *config_path);
 void ParseConfig(const char *config_path, PogPoolConfig *config);
+void ReplaceAll(char **buffer, const char *placeholder, const char *value);
+char *ReplaceAllChar(const char *buffer, const char *placeholder, const char *value);
+
 
 #endif // GENERATE_FILES
 
