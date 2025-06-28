@@ -36,7 +36,9 @@ release: pog_pool
 bench: pog_pool_benchmark python_benchmark
 
 pog_pool_benchmark: $(TEST_DIR)/benchmark_connection_pool.c $(BUILD_DIR)/connection.o | $(BIN_DIR)
-	$(CC) $(TEST_DIR)/benchmark_connection_pool.c $(BUILD_DIR)/connection.o $(CFLAGS) -o $(BIN_DIR)/benchmark_pool
+	$(CC) $(TEST_DIR)/benchmark_connection_pool.c $(BUILD_DIR)/connection.o $(CFLAGS) \
+		-lpog_pool -lpq  \
+		-o $(BIN_DIR)/benchmark_pool
 	./$(BIN_DIR)/benchmark_pool
 
 python_benchmark:
@@ -44,7 +46,7 @@ ifndef NO_VENV
 	@if [ ! -d "venv" ]; then \
 		echo "Creating virtual environment..."; \
 		python3 -m venv venv; \
-		. venv/bin/activate && pip install -r test/requirements.txt; \
+		. venv/bin/activate && pip install -r test/requirement.txt; \
 	else \
 		echo "Using existing virtual environment..."; \
 	fi
