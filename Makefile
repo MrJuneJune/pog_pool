@@ -33,9 +33,9 @@ release: pog_pool
 	cp -r include/* dist/include
 	cp $(BUILD_DIR)/libpog_pool.a dist 
 
-bench: pog_pool_benchmark python_benchmark
+bench_mark: pog_pool_benchmark python_benchmark
 
-pog_pool_benchmark: $(TEST_DIR)/benchmark_connection_pool.c $(BUILD_DIR)/connection.o | $(BIN_DIR)
+pog_pool_benchmark: pog_pool $(TEST_DIR)/benchmark_connection_pool.c $(BUILD_DIR)/connection.o | $(BIN_DIR)
 	$(CC) $(TEST_DIR)/benchmark_connection_pool.c $(BUILD_DIR)/connection.o $(CFLAGS) \
 		-lpog_pool -lpq  \
 		-o $(BIN_DIR)/benchmark_pool
