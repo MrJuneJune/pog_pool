@@ -32,7 +32,7 @@ release: pog_pool  | $(DIST_DIR)
 	cp -r include/* $(DIST_DIR)/include
 	cp $(BUILD_DIR)/libpog_pool.a $(DIST_DIR) 
 
-bench_mark: pog_pool_benchmark python_benchmark
+bench_mark: example pog_pool_benchmark python_benchmark
 
 pog_pool_benchmark: pog_pool $(TEST_DIR)/benchmark_connection_pool.c $(BUILD_DIR)/connection.o | $(BIN_DIR)
 	$(CC) $(TEST_DIR)/benchmark_connection_pool.c $(BUILD_DIR)/connection.o $(CFLAGS) \
@@ -67,7 +67,8 @@ auto_generate: pog_pool | $(BIN_DIR)
 		-o $(BIN_DIR)/auto_generate
 	cd example && ../$(BIN_DIR)/auto_generate
 
-pog_pool: $(SHARED_LIB) $(BUILD_DIR)/libpog_pool.a
+# pog_pool: $(SHARED_LIB) $(BUILD_DIR)/libpog_pool.a
+pog_pool:$(BUILD_DIR)/libpog_pool.a
 
 $(SHARED_LIB): $(BUILD_DIR)/connection.o $(BUILD_DIR)/auto_generate.o
 	$(CC) -dynamiclib $(CFLAGS) -lpq \
@@ -114,10 +115,10 @@ install_libpq_mac: prepare_dirs
 install_libpq_linux: prepare_dirs
 	@echo "Installing libpq via apt..."
 	sudo apt-get update
-	sudo apt-get install -y libpq 
+	sudo apt-get install -y libpq-dev
 	@echo "Copying libpq headers and libs to third_party..."
 	cp -r /usr/include/postgresql/* $(THIRD_PARTY_INCLUDE_DIR)/postgresql/
-	cp -r /usr/lib/*libpq.* $(THIRD_PARTY_LIB_DIR)/
+#	cp -r /usr/lib/*libpq.* $(THIRD_PARTY_LIB_DIR)/
 
 prepare_dirs:
 	mkdir -p $(THIRD_PARTY_INCLUDE_DIR)/postgresql
